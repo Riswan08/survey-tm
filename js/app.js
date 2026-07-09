@@ -25,6 +25,11 @@ function hargaEfektif(kode) {
   return (ov !== undefined && ov !== null && ov !== '') ? Number(ov) : MATERIALS[kode].harga;
 }
 
+function jasaEfektif(kode) {
+  const ov = state.settings.jasaOverride[kode];
+  return (ov !== undefined && ov !== null && ov !== '') ? Number(ov) : (MATERIALS[kode].jasa || 0);
+}
+
 function haversine(a, b) {
   const R = 6371000, rad = Math.PI / 180;
   const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
@@ -85,6 +90,11 @@ function normalisasiState(d) {
   if (s.hargaOverride && typeof s.hargaOverride === 'object') {
     Object.entries(s.hargaOverride).forEach(([kode, h]) => {
       if (MATERIALS[kode] && isFinite(Number(h)) && Number(h) >= 0) hasil.settings.hargaOverride[kode] = Number(h);
+    });
+  }
+  if (s.jasaOverride && typeof s.jasaOverride === 'object') {
+    Object.entries(s.jasaOverride).forEach(([kode, h]) => {
+      if (MATERIALS[kode] && isFinite(Number(h)) && Number(h) >= 0) hasil.settings.jasaOverride[kode] = Number(h);
     });
   }
   return hasil;
@@ -288,10 +298,14 @@ function bomTiang(pole) {
 
 function biayaPerTiang(pole) {
   const bom = bomTiang(pole);
-  let material = 0;
-  Object.entries(bom).forEach(([kode, q]) => { material += hargaEfektif(kode) * q; });
-  const jasa = hargaEfektif('JASA_TIANG');
-  return { bom, material, jasa, total: material + jasa };
+  let material = 0, jasaKonstruksi = 0;
+  Object.entries(bom).forEach(([kode, q]) => {
+    material += hargaEfektif(kode) * q;
+    jasaKonstruksi += jasaEfektif(kode) * q;
+  });
+  const jasaTanam = hargaEfektif('JASA_TIANG');
+  const jasa = jasaKonstruksi + jasaTanam;
+  return { bom, material, jasaKonstruksi, jasaTanam, jasa, total: material + jasa };
 }
 
 function panjangRute() {
@@ -308,11 +322,14 @@ function hitungRAB() {
   state.poles.forEach(p => {
     Object.entries(bomTiang(p)).forEach(([kode, q]) => { rekap[kode] = (rekap[kode] || 0) + q; });
   });
-  let totalMaterialTiang = 0;
+  let totalMaterialTiang = 0, totalJasaKonstruksi = 0;
   const barisRekap = Object.entries(rekap).map(([kode, qty]) => {
-    const h = hargaEfektif(kode), jml = h * qty;
-    totalMaterialTiang += jml;
-    return { kode, nama: MATERIALS[kode].nama, satuan: MATERIALS[kode].satuan, qty, harga: h, jumlah: jml };
+    const h = hargaEfektif(kode), j = jasaEfektif(kode);
+    const jmlMaterial = h * qty, jmlJasa = j * qty;
+    totalMaterialTiang += jmlMaterial;
+    totalJasaKonstruksi += jmlJasa;
+    return { kode, nama: MATERIALS[kode].nama, satuan: MATERIALS[kode].satuan, qty,
+             harga: h, jasa: j, jmlMaterial, jmlJasa, jumlah: jmlMaterial + jmlJasa };
   });
 
   // 2) penghantar berdasarkan panjang rute (sampai tiang terakhir)
@@ -325,11 +342,11 @@ function hitungRAB() {
   const jasaTiang = state.poles.length * hargaEfektif('JASA_TIANG');
   const jasaTarik = (rute / 1000) * hargaEfektif('JASA_TARIK');
 
-  const subtotal = totalMaterialTiang + biayaPenghantar + jasaTiang + jasaTarik;
+  const subtotal = totalMaterialTiang + totalJasaKonstruksi + biayaPenghantar + jasaTiang + jasaTarik;
   const ppn = s.ppnAktif ? subtotal * (s.ppnPersen / 100) : 0;
 
   return {
-    barisRekap, totalMaterialTiang,
+    barisRekap, totalMaterialTiang, totalJasaKonstruksi,
     rute, ph, panjangKawat, biayaPenghantar,
     jasaTiang, jasaTarik,
     subtotal, ppn, grandTotal: subtotal + ppn,
@@ -417,7 +434,7 @@ function perbaruiPratinjauBiaya() {
   $('#f-pratinjau').innerHTML =
     `<b>${p.konstruksi} — ${k.nama}</b><br>
      <span style="font-size:11px">${rincian}</span><br>
-     Material: <b>${rupiah(b.material)}</b> &nbsp;+&nbsp; Jasa: <b>${rupiah(b.jasa)}</b><br>
+     Material: <b>${rupiah(b.material)}</b> + Jasa pasang: <b>${rupiah(b.jasaKonstruksi)}</b> + Jasa tanam tiang: <b>${rupiah(b.jasaTanam)}</b><br>
      Total titik ini: <b>${rupiah(b.total)}</b>`;
 }
 
@@ -667,17 +684,24 @@ function renderRAB() {
   const s = state.settings;
   let html = '';
 
-  html += `<div class="judul-seksi">A. Rekap Material Tiang & Konstruksi</div>`;
+  html += `<div class="judul-seksi">A. Rekap Material & Jasa Konstruksi (format lampiran UIW MMU)</div>`;
   if (rab.barisRekap.length === 0) {
     html += `<p class="catatan-kecil">Belum ada tiang. Lakukan taging di peta terlebih dahulu.</p>`;
   } else {
     html += `<div class="bungkus-tabel"><table class="rab">
-      <tr><th>Uraian Material</th><th class="angka">Vol</th><th>Sat</th><th class="angka">Harga Satuan</th><th class="angka">Jumlah</th></tr>`;
+      <tr><th>Uraian</th><th class="angka">Vol</th><th>Sat</th>
+        <th class="angka">Material (Rp)</th><th class="angka">Jasa (Rp)</th>
+        <th class="angka">Jml Material</th><th class="angka">Jml Jasa</th><th class="angka">Jumlah</th></tr>`;
     rab.barisRekap.forEach(b => {
       html += `<tr><td>${b.nama}</td><td class="angka">${angka(b.qty)}</td><td>${b.satuan}</td>
-        <td class="angka">${rupiah(b.harga)}</td><td class="angka">${rupiah(b.jumlah)}</td></tr>`;
+        <td class="angka">${angka(b.harga)}</td><td class="angka">${angka(b.jasa)}</td>
+        <td class="angka">${angka(b.jmlMaterial)}</td><td class="angka">${angka(b.jmlJasa)}</td>
+        <td class="angka">${angka(b.jumlah)}</td></tr>`;
     });
-    html += `<tr class="sub"><td colspan="4">Subtotal Material</td><td class="angka">${rupiah(rab.totalMaterialTiang)}</td></tr>
+    html += `<tr class="sub"><td colspan="5">Subtotal A</td>
+      <td class="angka">${angka(rab.totalMaterialTiang)}</td>
+      <td class="angka">${angka(rab.totalJasaKonstruksi)}</td>
+      <td class="angka">${angka(rab.totalMaterialTiang + rab.totalJasaKonstruksi)}</td></tr>
       </table></div>`;
   }
 
@@ -706,7 +730,8 @@ function renderRAB() {
       <tr><td>PPN ${s.ppnAktif ? s.ppnPersen + '%' : '(nonaktif)'}</td><td class="angka">${rupiah(rab.ppn)}</td></tr>
       <tr class="total"><td>GRAND TOTAL RAB</td><td class="angka">${rupiah(rab.grandTotal)}</td></tr>
     </table></div>
-    <p class="catatan-kecil">⚠️ Harga satuan adalah contoh — sesuaikan di menu Pengaturan dengan harga SKKI/HPS unit Anda.</p>`;
+    <p class="catatan-kecil">Harga konstruksi & pendukung sesuai Lampiran Harga Satuan JTM Tiang Besi UIW Maluku &amp; Maluku Utara.
+    ⚠️ Harga <b>batang tiang</b> dan <b>penghantar</b> tidak ada di lampiran — masih contoh, sesuaikan di menu Pengaturan.</p>`;
 
   // rincian per tiang
   html += `<div class="judul-seksi">Rincian Per Tiang</div>`;
@@ -785,19 +810,21 @@ function renderPengaturan() {
   $('#s-ppn').value = s.ppnPersen;
   $('#s-akurasi').value = s.akurasiMin;
 
-  // editor harga per kategori
-  const label = { tiang: 'Tiang', material: 'Material Konstruksi', pengaman: 'Pengaman / Aksesoris', penghantar: 'Penghantar', jasa: 'Jasa' };
+  // editor harga per kategori — material konstruksi punya dua kolom: material & jasa pasang
+  const label = { tiang: 'Batang Tiang (harga contoh)', material: 'Material Konstruksi & Pendukung (lampiran UIW MMU)', penghantar: 'Penghantar (harga contoh)', jasa: 'Jasa Gelondongan (harga contoh)' };
   const wadah = $('#editor-harga');
   wadah.innerHTML = '';
   Object.entries(label).forEach(([kat, judul]) => {
     const grup = document.createElement('div');
     grup.className = 'grup-harga';
-    grup.innerHTML = `<h4>${judul}</h4>`;
+    grup.innerHTML = `<h4>${judul}</h4>` +
+      (kat === 'material' ? `<div class="baris-harga"><div class="nm"></div><small style="width:130px;text-align:center">Material</small><small style="width:130px;text-align:center">Jasa</small></div>` : '');
     Object.entries(MATERIALS).filter(([, m]) => m.kategori === kat).forEach(([kode, m]) => {
       const baris = document.createElement('div');
       baris.className = 'baris-harga';
       baris.innerHTML = `<div class="nm">${m.nama} <small>/ ${m.satuan}</small></div>
-        <input type="number" min="0" step="1000" data-kode="${kode}" value="${hargaEfektif(kode)}">`;
+        <input type="number" min="0" step="100" data-kode="${kode}" data-jenis="harga" value="${hargaEfektif(kode)}" title="Harga material">` +
+        (kat === 'material' ? `<input type="number" min="0" step="100" data-kode="${kode}" data-jenis="jasa" value="${jasaEfektif(kode)}" title="Harga jasa pasang">` : '');
       grup.appendChild(baris);
     });
     wadah.appendChild(grup);
@@ -815,8 +842,13 @@ function simpanPengaturan() {
   document.querySelectorAll('#editor-harga input[data-kode]').forEach(inp => {
     const kode = inp.dataset.kode, nilai = Number(inp.value);
     if (inp.value === '' || !isFinite(nilai) || nilai < 0) return; // kosong / tidak valid → harga lama dipertahankan
-    if (nilai !== MATERIALS[kode].harga) s.hargaOverride[kode] = nilai;
-    else delete s.hargaOverride[kode];
+    if (inp.dataset.jenis === 'jasa') {
+      if (nilai !== (MATERIALS[kode].jasa || 0)) s.jasaOverride[kode] = nilai;
+      else delete s.jasaOverride[kode];
+    } else {
+      if (nilai !== MATERIALS[kode].harga) s.hargaOverride[kode] = nilai;
+      else delete s.hargaOverride[kode];
+    }
   });
   simpan(); render();
   tutupModal('modal-pengaturan');
@@ -824,8 +856,9 @@ function simpanPengaturan() {
 }
 
 function resetHarga() {
-  if (!confirm('Kembalikan semua harga ke nilai bawaan data.js?')) return;
+  if (!confirm('Kembalikan semua harga (material & jasa) ke nilai bawaan data.js?')) return;
   state.settings.hargaOverride = {};
+  state.settings.jasaOverride = {};
   simpan(); renderPengaturan(); render();
 }
 
@@ -848,10 +881,10 @@ function eksporCSV() {
   baris('RAB SURVEY JARINGAN TM');
   baris('Tanggal ekspor', new Date().toLocaleString('id-ID'));
   baris('');
-  baris('A. REKAP MATERIAL TIANG & KONSTRUKSI');
-  baris('Uraian', 'Vol', 'Sat', 'Harga Satuan', 'Jumlah');
-  rab.barisRekap.forEach(b => baris(b.nama, b.qty, b.satuan, b.harga, b.jumlah));
-  baris('Subtotal Material', '', '', '', Math.round(rab.totalMaterialTiang));
+  baris('A. REKAP MATERIAL & JASA KONSTRUKSI (Lampiran UIW Maluku & Maluku Utara - Tiang Besi)');
+  baris('Uraian', 'Vol', 'Sat', 'Harga Material', 'Harga Jasa', 'Jml Material', 'Jml Jasa', 'Jumlah');
+  rab.barisRekap.forEach(b => baris(b.nama, b.qty, b.satuan, b.harga, b.jasa, b.jmlMaterial, b.jmlJasa, b.jumlah));
+  baris('Subtotal A', '', '', '', '', Math.round(rab.totalMaterialTiang), Math.round(rab.totalJasaKonstruksi), Math.round(rab.totalMaterialTiang + rab.totalJasaKonstruksi));
   baris('');
   baris('B. PENGHANTAR');
   baris('Panjang rute (m)', Math.round(rab.rute));
