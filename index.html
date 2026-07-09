@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Survey Taging TM — RAB Otomatis</title>
+  <meta name="theme-color" content="#0c6bb5">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body>
+
+  <!-- ===== TOP BAR ===== -->
+  <header id="topbar">
+    <span class="logo">⚡</span>
+    <div class="judul">Survey Taging TM<small>Taging Tiang &amp; RAB Otomatis — SUTM 20 kV</small></div>
+    <span id="badge-offline" class="sembunyi" title="Tidak ada internet — taging & GPS tetap berfungsi, data tersimpan di HP">📵 OFFLINE</span>
+    <div class="spacer"></div>
+    <button class="tombol-bar" id="btn-daftar">📋 Tiang</button>
+    <button class="tombol-bar" id="btn-rab">💰 RAB</button>
+    <button class="tombol-bar" id="btn-pengaturan">⚙️</button>
+    <button class="tombol-bar" id="btn-ekspor">📤</button>
+  </header>
+
+  <!-- ===== PETA ===== -->
+  <div id="map"></div>
+
+  <!-- ===== TOMBOL MELAYANG ===== -->
+  <div id="fab-wrap">
+    <button class="fab tag" id="btn-tag">🎯 Mode Taging</button>
+    <button class="fab gps" id="btn-gps">📍 Ambil Tikor GPS</button>
+    <button class="fab live" id="btn-live">🚶 Live Survey</button>
+  </div>
+
+  <!-- ===== PANEL LIVE SURVEY ===== -->
+  <div id="panel-live" class="sembunyi">
+    <div class="live-info">
+      <div class="li-kol"><span id="lv-jarak">—</span><small>dari tiang terakhir</small></div>
+      <div class="li-kol"><span id="lv-akurasi">—</span><small>akurasi GPS</small></div>
+      <div class="li-kol"><span id="lv-jumlah">0</span><small>tiang ditanam</small></div>
+    </div>
+    <div class="live-aksi">
+      <button id="lv-ikuti" title="Ikuti posisi saya">🎯</button>
+      <button id="lv-tanam">🗼 Tanam Tiang di Sini</button>
+      <button id="lv-stop" title="Hentikan live survey">⏹</button>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: TANAM CEPAT (LIVE) ===== -->
+  <div class="modal-latar" id="modal-cepat">
+    <div class="modal">
+      <div class="modal-kepala">🗼 Pilih Konstruksi — Tiang Ditanam di Posisi Anda
+        <button class="tutup" data-tutup="modal-cepat">×</button></div>
+      <div class="modal-isi">
+        <div class="form-baris">
+          <div class="form-grup"><label>Jenis Tiang</label>
+            <select id="q-tiang">
+              <option value="TIANG_12_200">Beton 12 m / 200 daN</option>
+              <option value="TIANG_12_350">Beton 12 m / 350 daN</option>
+              <option value="TIANG_13_350">Beton 13 m / 350 daN</option>
+              <option value="TIANG_14_500">Beton 14 m / 500 daN</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grup"><label>Aksesoris Tambahan</label><div id="q-aksesoris"></div></div>
+        <div class="form-grup"><label>Ketuk konstruksi untuk langsung menyimpan:</label>
+          <div id="q-konstruksi"></div></div>
+        <p class="catatan-kecil" id="q-posisi"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RINGKASAN BAWAH ===== -->
+  <div id="ringkas" title="Ketuk untuk lihat RAB lengkap">
+    <div class="kol"><div class="angka" id="r-tiang">0</div><div class="ket">Tiang</div></div>
+    <div class="kol"><div class="angka" id="r-jarak">0 m</div><div class="ket">Panjang Rute</div></div>
+    <div class="kol"><div class="angka" id="r-total">Rp 0</div><div class="ket">Total RAB</div></div>
+    <div class="buka">▲</div>
+  </div>
+
+  <!-- ===== MODAL: FORM TIANG ===== -->
+  <div class="modal-latar" id="modal-tiang">
+    <div class="modal">
+      <div class="modal-kepala"><span id="f-judul">Taging Tiang Baru</span>
+        <button class="tutup" data-tutup="modal-tiang">×</button></div>
+      <div class="modal-isi">
+        <div class="form-baris">
+          <div class="form-grup"><label>Nama / Kode Tiang</label><input type="text" id="f-nama" maxlength="40"></div>
+          <div class="form-grup"><label>Jenis Tiang</label>
+            <select id="f-tiang">
+              <option value="TIANG_12_200">Beton 12 m / 200 daN</option>
+              <option value="TIANG_12_350">Beton 12 m / 350 daN</option>
+              <option value="TIANG_13_350">Beton 13 m / 350 daN</option>
+              <option value="TIANG_14_500">Beton 14 m / 500 daN</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-baris">
+          <div class="form-grup"><label>Latitude</label><input type="number" step="any" id="f-lat"></div>
+          <div class="form-grup"><label>Longitude</label><input type="number" step="any" id="f-lng"></div>
+        </div>
+        <div class="form-grup">
+          <label>Jenis Konstruksi (Standar PLN)</label>
+          <div id="pilih-konstruksi"></div>
+        </div>
+        <div class="form-grup">
+          <label>Aksesoris Tambahan</label>
+          <div id="pilih-aksesoris"></div>
+        </div>
+        <div class="form-grup"><label>Catatan (opsional)</label>
+          <textarea id="f-catatan" rows="2" placeholder="mis. dekat rumah Bpk. Ahmad, tanah warga"></textarea></div>
+        <div class="info-biaya" id="f-pratinjau"></div>
+      </div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-tiang">Batal</button>
+        <button class="tombol utama" id="f-simpan">💾 Simpan Tiang</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: RAB ===== -->
+  <div class="modal-latar" id="modal-rab">
+    <div class="modal">
+      <div class="modal-kepala">💰 Rencana Anggaran Biaya (RAB)
+        <button class="tutup" data-tutup="modal-rab">×</button></div>
+      <div class="modal-isi" id="isi-rab"></div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-rab">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: DAFTAR TIANG ===== -->
+  <div class="modal-latar" id="modal-daftar">
+    <div class="modal">
+      <div class="modal-kepala">📋 Daftar Tiang (urutan = jalur jaringan)
+        <button class="tutup" data-tutup="modal-daftar">×</button></div>
+      <div class="modal-isi" id="isi-daftar"></div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-daftar">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: PENGATURAN ===== -->
+  <div class="modal-latar" id="modal-pengaturan">
+    <div class="modal">
+      <div class="modal-kepala">⚙️ Pengaturan &amp; Harga Satuan
+        <button class="tutup" data-tutup="modal-pengaturan">×</button></div>
+      <div class="modal-isi">
+        <div class="form-grup"><label>Jenis Penghantar Utama</label><select id="s-penghantar"></select></div>
+        <div class="form-baris">
+          <div class="form-grup"><label>Faktor Andongan (sag)</label><input type="number" id="s-sag" step="0.01" min="1"></div>
+          <div class="form-grup"><label>PPN (%)</label><input type="number" id="s-ppn" step="0.5" min="0"></div>
+          <div class="form-grup"><label>Batas Akurasi GPS (m)</label><input type="number" id="s-akurasi" step="1" min="1" max="500"></div>
+        </div>
+        <label class="cek-baris"><input type="checkbox" id="s-ppn-aktif"> Sertakan PPN dalam total RAB</label>
+        <div class="judul-seksi">Harga Satuan (bisa diubah, tersimpan di perangkat)</div>
+        <div id="editor-harga"></div>
+      </div>
+      <div class="modal-kaki">
+        <button class="tombol bahaya" id="s-reset">↺ Reset Harga</button>
+        <button class="tombol polos" data-tutup="modal-pengaturan">Batal</button>
+        <button class="tombol utama" id="s-simpan">💾 Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: EKSPOR / PROYEK ===== -->
+  <div class="modal-latar" id="modal-ekspor">
+    <div class="modal">
+      <div class="modal-kepala">📤 Ekspor &amp; Proyek
+        <button class="tutup" data-tutup="modal-ekspor">×</button></div>
+      <div class="modal-isi">
+        <div class="judul-seksi">Ekspor Hasil Survey</div>
+        <p class="catatan-kecil" style="margin-bottom:10px">RAB lengkap ke Excel, titik &amp; rute ke Google Earth.</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="tombol utama" id="e-csv">📊 Ekspor RAB ke CSV / Excel</button>
+          <button class="tombol utama" id="e-kml">🌍 Ekspor Titik ke KML (Google Earth)</button>
+        </div>
+        <div class="judul-seksi">Peta Offline</div>
+        <p class="catatan-kecil" style="margin-bottom:10px">Sebelum ke lokasi tanpa sinyal: buka area kerja di peta, lalu unduh. Tile peta tersimpan di HP dan tampil saat offline. GPS &amp; taging selalu berfungsi walau peta belum diunduh.</p>
+        <button class="tombol utama" id="e-tile" style="width:100%">🗺 Unduh Peta Area Ini untuk Offline</button>
+        <div class="judul-seksi">Simpan / Buka Proyek</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="tombol polos" id="e-json">💾 Simpan Proyek (file JSON)</button>
+          <label class="tombol polos" style="text-align:center">📂 Buka Proyek (JSON)
+            <input type="file" id="e-impor" accept=".json" hidden></label>
+          <button class="tombol bahaya" id="e-hapus">🗑 Hapus Semua / Proyek Baru</button>
+        </div>
+      </div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-ekspor">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/data.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
+  <script>
+    // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW gagal terdaftar:', e));
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+/* ====== SURVEY TAGING TM — STYLE ====== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --biru: #0c6bb5;
+  --biru-tua: #084d84;
+  --kuning: #ffd400;
+  --merah: #e53935;
+  --hijau: #2e7d32;
+  --abu: #f4f6f8;
+  --teks: #1c2733;
+  --radius: 12px;
+  --bayang: 0 2px 10px rgba(0,0,0,.18);
+}
+
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--teks);
+  overflow: hidden;
+}
+
+/* ---------- Top bar ---------- */
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1100;
+  height: 52px;
+  background: var(--biru);
+  color: #fff;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  box-shadow: var(--bayang);
+}
+#topbar .logo { font-size: 20px; }
+#topbar .judul { font-weight: 700; font-size: 15px; line-height: 1.1; white-space: nowrap; }
+#topbar .judul small { display: block; font-weight: 400; font-size: 10px; opacity: .85; }
+@media (max-width: 480px) {
+  #topbar .judul { font-size: 13px; }
+  #topbar .judul small { display: none; }
+  .tombol-bar { padding: 6px 8px; font-size: 11px; }
+}
+#topbar .spacer { flex: 1; }
+#badge-offline {
+  background: var(--merah); color: #fff;
+  font-size: 10px; font-weight: 800;
+  padding: 3px 7px; border-radius: 10px;
+  margin-left: 6px; white-space: nowrap;
+}
+.tombol-bar {
+  background: rgba(255,255,255,.15);
+  border: none; color: #fff;
+  padding: 7px 10px; border-radius: 8px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.tombol-bar:active { background: rgba(255,255,255,.3); }
+
+/* ---------- Peta ---------- */
+#map { position: fixed; inset: 52px 0 64px 0; z-index: 1; }
+
+/* Label tiang di peta */
+.label-tiang {
+  background: transparent; border: none;
+}
+.label-tiang .pin {
+  display: flex; flex-direction: column; align-items: center;
+  transform: translateY(-4px);
+}
+.label-tiang .titik {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.5);
+}
+.label-tiang .nama {
+  margin-top: 2px;
+  background: #fff; border-radius: 6px;
+  padding: 1px 5px;
+  font-size: 10px; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  white-space: nowrap;
+}
+.label-jarak {
+  background: rgba(255,255,255,.92);
+  border: 1px solid var(--biru);
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: 10px; font-weight: 700; color: var(--biru-tua);
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+
+/* ---------- Tombol melayang ---------- */
+#fab-wrap {
+  position: fixed; right: 12px; bottom: 84px; z-index: 1050;
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
+}
+.fab {
+  border: none; cursor: pointer;
+  border-radius: 28px;
+  padding: 13px 16px;
+  font-size: 13px; font-weight: 700;
+  box-shadow: var(--bayang);
+  display: flex; align-items: center; gap: 7px;
+}
+.fab.gps { background: var(--biru); color: #fff; }
+.fab.tag { background: #fff; color: var(--teks); }
+.fab.tag.aktif { background: var(--kuning); color: #000; }
+.fab.live { background: var(--hijau); color: #fff; }
+
+/* ---------- Panel live survey ---------- */
+.sembunyi { display: none !important; }
+#panel-live {
+  position: fixed; left: 0; right: 0; bottom: 64px; z-index: 1050;
+  background: #fff;
+  border-top: 3px solid var(--hijau);
+  box-shadow: 0 -3px 12px rgba(0,0,0,.15);
+  padding: 8px 10px 10px;
+}
+#panel-live .live-info { display: flex; margin-bottom: 8px; }
+#panel-live .li-kol { flex: 1; text-align: center; }
+#panel-live .li-kol span { display: block; font-weight: 800; font-size: 17px; color: var(--teks); }
+#panel-live .li-kol span.ideal { color: var(--hijau); }
+#panel-live .li-kol small { font-size: 10px; color: #6b7a89; }
+#panel-live .live-aksi { display: flex; gap: 8px; }
+#lv-tanam {
+  flex: 1; border: none; cursor: pointer;
+  background: var(--hijau); color: #fff;
+  border-radius: 10px; padding: 13px;
+  font-size: 15px; font-weight: 800;
+}
+#lv-ikuti, #lv-stop {
+  border: none; cursor: pointer; border-radius: 10px;
+  width: 48px; font-size: 17px;
+}
+#lv-ikuti { background: #e7ecf1; }
+#lv-ikuti.aktif { background: var(--kuning); }
+#lv-stop { background: #fdecea; color: var(--merah); }
+
+/* Kartu tanam cepat (dengan estimasi biaya) */
+#q-konstruksi { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 8px; }
+.kartu-q {
+  border: 2px solid #d7dee5; border-radius: 10px;
+  padding: 9px 10px; cursor: pointer; background: #fff;
+}
+.kartu-q:active { border-color: var(--hijau); background: #eef7ee; }
+.kartu-q .kode { font-weight: 800; font-size: 14px; }
+.kartu-q .fungsi { font-size: 11px; color: #45566a; margin: 2px 0; }
+.kartu-q .biaya { font-size: 12px; font-weight: 700; color: var(--hijau); }
+
+/* ---------- Bar ringkasan bawah ---------- */
+#ringkas {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 1100;
+  height: 64px;
+  background: #fff;
+  border-top: 1px solid #dfe5ea;
+  display: flex; align-items: center;
+  padding: 0 8px;
+  cursor: pointer;
+}
+#ringkas .kol { flex: 1; text-align: center; }
+#ringkas .kol .angka { font-weight: 800; font-size: 14px; color: var(--biru-tua); }
+#ringkas .kol .ket { font-size: 10px; color: #6b7a89; }
+#ringkas .buka { font-size: 18px; color: var(--biru); padding: 0 6px; }
+
+/* ---------- Modal ---------- */
+.modal-latar {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(10,25,40,.55);
+  display: none;
+  align-items: flex-end; justify-content: center;
+}
+.modal-latar.tampil { display: flex; }
+.modal {
+  background: #fff;
+  width: 100%; max-width: 640px;
+  max-height: 88vh;
+  border-radius: 16px 16px 0 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+@media (min-width: 700px) {
+  .modal-latar { align-items: center; }
+  .modal { border-radius: 16px; }
+}
+.modal-kepala {
+  background: var(--biru); color: #fff;
+  padding: 13px 16px;
+  font-weight: 700; font-size: 15px;
+  display: flex; align-items: center;
+}
+.modal-kepala .tutup {
+  margin-left: auto; background: none; border: none;
+  color: #fff; font-size: 20px; cursor: pointer; line-height: 1;
+}
+.modal-isi { padding: 14px 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.modal-kaki {
+  padding: 10px 16px;
+  border-top: 1px solid #e4e9ee;
+  display: flex; gap: 10px; justify-content: flex-end;
+  background: #fafbfc;
+}
+
+/* ---------- Form ---------- */
+.form-grup { margin-bottom: 13px; }
+.form-grup label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 5px; color: #37475a; }
+.form-grup input[type=text], .form-grup input[type=number], .form-grup select, .form-grup textarea {
+  width: 100%;
+  border: 1px solid #c6d0da;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 14px;
+  background: #fff;
+}
+.form-baris { display: flex; gap: 10px; }
+.form-baris .form-grup { flex: 1; }
+.cek-baris { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+.cek-baris input { width: 17px; height: 17px; }
+
+/* Kartu pilihan konstruksi */
+#pilih-konstruksi { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.kartu-k {
+  border: 2px solid #d7dee5; border-radius: 10px;
+  padding: 8px 9px; cursor: pointer;
+  background: #fff;
+}
+.kartu-k.pilih { border-color: var(--biru); background: #eaf4fd; }
+.kartu-k .kode { font-weight: 800; font-size: 13px; }
+.kartu-k .fungsi { font-size: 11px; color: #45566a; margin-top: 2px; }
+.kartu-k .sudut { font-size: 10px; color: #7c8b9a; margin-top: 2px; }
+
+.info-biaya {
+  background: #eef7ee; border: 1px solid #bfdcbf;
+  border-radius: 10px; padding: 10px 12px;
+  font-size: 13px; margin-top: 4px;
+}
+.info-biaya b { color: var(--hijau); }
+
+/* ---------- Tombol umum ---------- */
+.tombol {
+  border: none; cursor: pointer;
+  border-radius: 9px;
+  padding: 10px 18px;
+  font-size: 13px; font-weight: 700;
+}
+.tombol.utama { background: var(--biru); color: #fff; }
+.tombol.polos { background: #e7ecf1; color: var(--teks); }
+.tombol.bahaya { background: var(--merah); color: #fff; }
+.tombol.kecil { padding: 5px 9px; font-size: 11px; border-radius: 7px; }
+
+/* ---------- Tabel ---------- */
+.bungkus-tabel { overflow-x: auto; margin-bottom: 14px; }
+table.rab { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 460px; }
+table.rab th {
+  background: var(--biru-tua); color: #fff;
+  padding: 7px 8px; text-align: left; white-space: nowrap;
+}
+table.rab td { padding: 6px 8px; border-bottom: 1px solid #e6ebf0; vertical-align: top; }
+table.rab tr.total td { font-weight: 800; background: #fff8dc; border-top: 2px solid var(--kuning); }
+table.rab tr.sub td { font-weight: 700; background: #f0f4f8; }
+td.angka, th.angka { text-align: right; white-space: nowrap; }
+
+.judul-seksi {
+  font-size: 13px; font-weight: 800; color: var(--biru-tua);
+  margin: 16px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--kuning);
+}
+.judul-seksi:first-child { margin-top: 0; }
+
+.catatan-kecil { font-size: 11px; color: #7c8b9a; margin-top: 6px; }
+
+/* ---------- Daftar tiang ---------- */
+.item-tiang {
+  display: flex; align-items: center; gap: 9px;
+  border: 1px solid #dde4ea; border-radius: 10px;
+  padding: 9px 10px; margin-bottom: 8px;
+}
+.item-tiang .bulat {
+  width: 30px; height: 30px; border-radius: 50%;
+  color: #fff; font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.item-tiang .isi { flex: 1; min-width: 0; }
+.item-tiang .nm { font-weight: 700; font-size: 13px; }
+.item-tiang .dt { font-size: 11px; color: #61707f; }
+.item-tiang .aksi { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- Popup leaflet ---------- */
+.popup-tiang { font-size: 12px; min-width: 170px; }
+.popup-tiang .pjudul { font-weight: 800; font-size: 13px; margin-bottom: 3px; }
+.popup-tiang .pinfo { color: #4a5a6a; margin-bottom: 7px; line-height: 1.5; }
+.popup-tiang .paksi { display: flex; gap: 6px; }
+
+/* ---------- Pengaturan harga ---------- */
+.grup-harga h4 { font-size: 12px; margin: 12px 0 6px; color: var(--biru-tua); text-transform: uppercase; }
+.baris-harga { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.baris-harga .nm { flex: 1; font-size: 12px; }
+.baris-harga .nm small { color: #8494a4; }
+.baris-harga input { width: 130px; text-align: right; border: 1px solid #c6d0da; border-radius: 7px; padding: 6px 8px; font-size: 13px; }
+
+/* toast */
+#toast {
+  position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%);
+  background: #263445; color: #fff;
+  padding: 9px 16px; border-radius: 20px;
+  font-size: 13px; z-index: 1500;
+  opacity: 0; transition: opacity .25s;
+  pointer-events: none;
+  max-width: 90vw; text-align: center;
+}
+#toast.tampil { opacity: 1; }

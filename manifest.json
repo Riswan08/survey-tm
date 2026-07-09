@@ -1,0 +1,17 @@
+{
+  "name": "Survey Taging TM — RAB Otomatis",
+  "short_name": "Survey TM",
+  "description": "Aplikasi survey taging tiang TM (SUTM 20 kV) dengan RAB otomatis. Bisa dipakai offline — GPS HP tetap berfungsi tanpa sinyal data.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c6bb5",
+  "theme_color": "#0c6bb5",
+  "lang": "id",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
