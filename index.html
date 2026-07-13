@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Survey Taging TM — RAB Otomatis</title>
+  <title>CAKRA — Cerdas Analisis Kebutuhan Rencana Aset</title>
   <meta name="theme-color" content="#0c6bb5">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 
   <!-- ===== TOP BAR ===== -->
   <header id="topbar">
-    <span class="logo">⚡</span>
-    <div class="judul">Survey Taging TM<small>Taging Tiang &amp; RAB Otomatis — SUTM 20 kV</small></div>
+    <img class="logo-img" src="icons/icon-192.png" alt="CAKRA">
+    <div class="judul">CAKRA<small>Cepat • Tepat • Akurat — Survey Aset Distribusi</small></div>
     <span id="badge-offline" class="sembunyi" title="Tidak ada internet — taging & GPS tetap berfungsi, data tersimpan di HP">📵 OFFLINE</span>
     <div class="spacer"></div>
     <button class="tombol-bar" id="btn-daftar">📋 Tiang</button>
@@ -86,31 +86,39 @@
       <div class="modal-kepala"><span id="f-judul">Taging Tiang Baru</span>
         <button class="tutup" data-tutup="modal-tiang">×</button></div>
       <div class="modal-isi">
+        <div class="form-grup">
+          <div class="seg" id="f-mode">
+            <button type="button" data-mode="rencana" class="aktif">🆕 Rencana Baru</button>
+            <button type="button" data-mode="eksisting">📋 Aset Eksisting</button>
+          </div>
+        </div>
         <div class="form-baris">
-          <div class="form-grup"><label>Nama / Kode Tiang</label><input type="text" id="f-nama" maxlength="40"></div>
-          <div class="form-grup"><label>Jenis Tiang</label>
-            <select id="f-tiang">
-              <option value="TIANG_12_200">Beton 12 m / 200 daN</option>
-              <option value="TIANG_12_350">Beton 12 m / 350 daN</option>
-              <option value="TIANG_13_350">Beton 13 m / 350 daN</option>
-              <option value="TIANG_14_500">Beton 14 m / 500 daN</option>
-            </select>
+          <div class="form-grup"><label>Nama / Kode Titik</label><input type="text" id="f-nama" maxlength="40"></div>
+          <div class="form-grup" id="grup-jenis-tiang"><label>Jenis Tiang</label>
+            <select id="f-tiang"></select>
           </div>
         </div>
         <div class="form-baris">
           <div class="form-grup"><label>Latitude</label><input type="number" step="any" id="f-lat"></div>
           <div class="form-grup"><label>Longitude</label><input type="number" step="any" id="f-lng"></div>
         </div>
-        <div class="form-grup">
-          <label>Jenis Konstruksi (Standar PLN)</label>
-          <div id="pilih-konstruksi"></div>
+        <div id="grup-rencana">
+          <div class="form-grup">
+            <label>Jenis Konstruksi (Standar PLN)</label>
+            <div id="pilih-konstruksi"></div>
+          </div>
+          <div class="form-grup">
+            <label>Aksesoris / Pekerjaan Pendukung</label>
+            <div id="pilih-aksesoris"></div>
+          </div>
         </div>
-        <div class="form-grup">
-          <label>Aksesoris Tambahan</label>
-          <div id="pilih-aksesoris"></div>
+        <div id="grup-eksisting" class="sembunyi">
+          <div class="form-grup"><label>Jenis Aset</label><select id="f-jenis-aset"></select></div>
+          <div class="form-grup"><label>Kondisi Aset</label><div class="seg" id="f-kondisi"></div></div>
+          <p class="catatan-kecil">Aset eksisting tidak masuk RAB — di fase berikutnya (M3) kondisi rusak akan otomatis membawa usulan perbaikan + RAB-nya.</p>
         </div>
         <div class="form-grup"><label>Catatan (opsional)</label>
-          <textarea id="f-catatan" rows="2" placeholder="mis. dekat rumah Bpk. Ahmad, tanah warga"></textarea></div>
+          <textarea id="f-catatan" rows="2" placeholder="mis. tiang keropos di pangkal, dekat rumah Bpk. Ahmad"></textarea></div>
         <div class="info-biaya" id="f-pratinjau"></div>
       </div>
       <div class="modal-kaki">
@@ -200,8 +208,8 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=4"></script>
-  <script src="js/app.js?v=4"></script>
+  <script src="js/data.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

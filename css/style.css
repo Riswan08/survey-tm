@@ -31,6 +31,7 @@ body {
   box-shadow: var(--bayang);
 }
 #topbar .logo { font-size: 20px; }
+#topbar .logo-img { width: 34px; height: 34px; border-radius: 8px; }
 #topbar .judul { font-weight: 700; font-size: 15px; line-height: 1.1; white-space: nowrap; }
 #topbar .judul small { display: block; font-weight: 400; font-size: 10px; opacity: .85; }
 @media (max-width: 480px) {
@@ -214,6 +215,18 @@ body {
 .form-baris .form-grup { flex: 1; }
 .cek-baris { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
 .cek-baris input { width: 17px; height: 17px; }
+
+/* Toggle segmen (mode rencana/eksisting, kondisi aset) */
+.seg { display: flex; gap: 6px; }
+.seg button {
+  flex: 1; border: 2px solid #d7dee5; background: #fff;
+  border-radius: 9px; padding: 9px 6px;
+  font-size: 13px; font-weight: 700; cursor: pointer; color: var(--teks);
+}
+.seg button.aktif { border-color: var(--biru); background: #eaf4fd; color: var(--biru-tua); }
+.seg button.aktif[data-kondisi="baik"] { border-color: #2e7d32; background: #eef7ee; color: #2e7d32; }
+.seg button.aktif[data-kondisi="rusakRingan"] { border-color: #f57c00; background: #fff3e6; color: #f57c00; }
+.seg button.aktif[data-kondisi="rusakBerat"] { border-color: #e53935; background: #fdecea; color: #e53935; }
 
 /* Kartu pilihan konstruksi */
 #pilih-konstruksi { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }

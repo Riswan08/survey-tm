@@ -59,12 +59,18 @@ function normalisasiPole(p, indeks) {
     id: Number.isInteger(p.id) && p.id > 0 ? p.id : indeks + 1,
     nama: (typeof p.nama === 'string' && p.nama.trim()) ? p.nama.trim().slice(0, 40) : `T-${String(indeks + 1).padStart(2, '0')}`,
     lat, lng,
+    mode: p.mode === 'eksisting' ? 'eksisting' : 'rencana',
     tiang: MATERIALS[p.tiang] && MATERIALS[p.tiang].kategori === 'tiang' ? p.tiang : DEFAULT_TIANG,
     konstruksi: KONSTRUKSI[p.konstruksi] ? p.konstruksi : 'TM-1',
     aksesoris: Array.isArray(p.aksesoris) ? p.aksesoris.filter(a => AKSESORIS[a]) : [],
+    jenisAset: JENIS_ASET[p.jenisAset] ? p.jenisAset : 'TIANG_TM',
+    kondisi: KONDISI[p.kondisi] ? p.kondisi : 'baik',
     catatan: typeof p.catatan === 'string' ? p.catatan.slice(0, 300) : '',
   };
 }
+
+// titik rencana = rantai jaringan yang dihitung RAB & jaraknya; aset eksisting terpisah
+const polesRencana = () => state.poles.filter(p => p.mode !== 'eksisting');
 
 function normalisasiState(d) {
   const bawaan = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -109,19 +115,24 @@ function muat() {
   idBerikut = Math.max(0, ...state.poles.map(p => p.id)) + 1;
 }
 
-// nomor tiang otomatis berikutnya: lanjut dari nomor terbesar yang ada (aman setelah hapus)
-function namaBerikut() {
-  let maks = 0;
+// nomor otomatis berikutnya per awalan (T- rencana, A- aset eksisting)
+function namaBerikut(awalan = 'T') {
+  const re = new RegExp(`^${awalan}-?(\\d+)$`, 'i');
+  let maks = 0, jumlah = 0;
   state.poles.forEach(p => {
-    const m = /^T-?(\d+)$/i.exec(p.nama);
+    const cocokMode = awalan === 'A' ? p.mode === 'eksisting' : p.mode !== 'eksisting';
+    if (cocokMode) jumlah++;
+    const m = re.exec(p.nama);
     if (m) maks = Math.max(maks, parseInt(m[1], 10));
   });
-  return `T-${String(Math.max(maks, state.poles.length) + 1).padStart(2, '0')}`;
+  return `${awalan}-${String(Math.max(maks, jumlah) + 1).padStart(2, '0')}`;
 }
 
-// pemeriksaan kewajaran gawang — cegah tikor salah (GPS loncat / salah ketuk)
+// pemeriksaan kewajaran gawang — cegah tikor salah (GPS loncat / salah ketuk).
+// hanya untuk titik rencana (rantai jaringan); aset eksisting bebas posisinya.
 function periksaGawang(p, kecualiId) {
-  const lainnya = state.poles.filter(x => x.id !== kecualiId);
+  if (p.mode === 'eksisting') return true;
+  const lainnya = polesRencana().filter(x => x.id !== kecualiId);
   const akhir = lainnya[lainnya.length - 1];
   if (!akhir) return true;
   const d = haversine(akhir, p);
@@ -213,6 +224,15 @@ async function unduhTileArea() {
 }
 
 function ikonTiang(pole, idx) {
+  if (pole.mode === 'eksisting') {
+    const k = KONDISI[pole.kondisi] || KONDISI.baik;
+    const j = JENIS_ASET[pole.jenisAset] || { nama: '?' };
+    return L.divIcon({
+      className: 'label-tiang',
+      html: `<div class="pin"><div class="titik" style="background:${k.warna};border-radius:3px"></div><div class="nama">${pole.nama} · ${j.nama}</div></div>`,
+      iconSize: [0, 0],
+    });
+  }
   const warna = (KONSTRUKSI[pole.konstruksi] || {}).warna || '#555';
   return L.divIcon({
     className: 'label-tiang',
@@ -225,12 +245,12 @@ function render() {
   layerTiang.clearLayers();
   layerGaris.clearLayers();
 
-  // garis jaringan + label jarak per gawang (span)
-  const titik = state.poles.map(p => [p.lat, p.lng]);
-  if (titik.length > 1) {
-    L.polyline(titik, { color: '#0c6bb5', weight: 3, dashArray: '6 4' }).addTo(layerGaris);
-    for (let i = 1; i < state.poles.length; i++) {
-      const a = state.poles[i - 1], b = state.poles[i];
+  // garis jaringan + label jarak per gawang — hanya titik rencana
+  const rencana = polesRencana();
+  if (rencana.length > 1) {
+    L.polyline(rencana.map(p => [p.lat, p.lng]), { color: '#0c6bb5', weight: 3, dashArray: '6 4' }).addTo(layerGaris);
+    for (let i = 1; i < rencana.length; i++) {
+      const a = rencana[i - 1], b = rencana[i];
       const d = haversine(a, b);
       L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
         icon: L.divIcon({ className: 'label-jarak', html: `${angka(d, 0)} m`, iconSize: null }),
@@ -260,18 +280,31 @@ function render() {
 }
 
 function popupTiang(pole) {
-  const k = KONSTRUKSI[pole.konstruksi] || { nama: '?' };
-  const biaya = biayaPerTiang(pole).total;
   const div = document.createElement('div');
   div.className = 'popup-tiang';
-  div.innerHTML = `
+  let isi;
+  if (pole.mode === 'eksisting') {
+    const j = JENIS_ASET[pole.jenisAset] || { nama: '?' };
+    const kd = KONDISI[pole.kondisi] || KONDISI.baik;
+    isi = `
+    <div class="pjudul">${pole.nama} — ${j.nama}</div>
+    <div class="pinfo">
+      Kondisi: <b style="color:${kd.warna}">${kd.nama}</b><br>
+      ${pole.lat.toFixed(6)}, ${pole.lng.toFixed(6)}
+      ${pole.catatan ? '<br>' + pole.catatan : ''}
+    </div>`;
+  } else {
+    const k = KONSTRUKSI[pole.konstruksi] || { nama: '?' };
+    isi = `
     <div class="pjudul">${pole.nama} — ${pole.konstruksi}</div>
     <div class="pinfo">
       ${k.nama}<br>
       ${MATERIALS[pole.tiang].nama}<br>
       ${pole.lat.toFixed(6)}, ${pole.lng.toFixed(6)}<br>
-      <b>Biaya titik ini: ${rupiah(biaya)}</b>
-    </div>
+      <b>Biaya titik ini: ${rupiah(biayaPerTiang(pole).total)}</b>
+    </div>`;
+  }
+  div.innerHTML = isi + `
     <div class="paksi">
       <button class="tombol utama kecil" data-aksi="edit">✏️ Edit</button>
       <button class="tombol bahaya kecil" data-aksi="hapus">🗑 Hapus</button>
@@ -309,17 +342,19 @@ function biayaPerTiang(pole) {
 }
 
 function panjangRute() {
+  const rencana = polesRencana();
   let total = 0;
-  for (let i = 1; i < state.poles.length; i++) total += haversine(state.poles[i - 1], state.poles[i]);
+  for (let i = 1; i < rencana.length; i++) total += haversine(rencana[i - 1], rencana[i]);
   return total; // meter
 }
 
 function hitungRAB() {
   const s = state.settings;
+  const rencana = polesRencana(); // aset eksisting belum masuk RAB (usulan perbaikan = M3)
 
-  // 1) rekap material seluruh tiang
+  // 1) rekap material seluruh titik rencana
   const rekap = {}; // kode -> qty
-  state.poles.forEach(p => {
+  rencana.forEach(p => {
     Object.entries(bomTiang(p)).forEach(([kode, q]) => { rekap[kode] = (rekap[kode] || 0) + q; });
   });
   let totalMaterialTiang = 0, totalJasaKonstruksi = 0;
@@ -339,7 +374,7 @@ function hitungRAB() {
   const biayaPenghantar = panjangKawat * hargaEfektif(s.penghantar);
 
   // 3) jasa
-  const jasaTiang = state.poles.length * hargaEfektif('JASA_TIANG');
+  const jasaTiang = rencana.length * hargaEfektif('JASA_TIANG');
   const jasaTarik = (rute / 1000) * hargaEfektif('JASA_TARIK');
 
   const subtotal = totalMaterialTiang + totalJasaKonstruksi + biayaPenghantar + jasaTiang + jasaTarik;
@@ -355,21 +390,41 @@ function hitungRAB() {
 
 function perbaruiRingkasan() {
   const rab = hitungRAB();
-  $('#r-tiang').textContent = state.poles.length;
+  $('#r-tiang').textContent = polesRencana().length;
   $('#r-jarak').textContent = rab.rute >= 1000 ? angka(rab.rute / 1000, 2) + ' km' : angka(rab.rute, 0) + ' m';
   $('#r-total').textContent = rupiah(rab.grandTotal);
   if (liveAktif) perbaruiPanelLive(); // panel live ikut segar setelah tambah/hapus/geser tiang
 }
 
-// ---------------- FORM TIANG (TAMBAH / EDIT) ----------------
+// ---------------- FORM TITIK (TAMBAH / EDIT) ----------------
+let draftModeTitik = 'rencana';
+let draftKondisi = 'baik';
+
+function terapkanModeForm() {
+  const eksisting = draftModeTitik === 'eksisting';
+  $('#grup-rencana').classList.toggle('sembunyi', eksisting);
+  $('#grup-eksisting').classList.toggle('sembunyi', !eksisting);
+  $('#grup-jenis-tiang').classList.toggle('sembunyi', eksisting);
+  document.querySelectorAll('#f-mode button').forEach(b =>
+    b.classList.toggle('aktif', b.dataset.mode === draftModeTitik));
+  // nama otomatis ikut mode (hanya saat tambah baru & belum diedit manual)
+  if (!editId) {
+    const nilai = $('#f-nama').value;
+    if (/^[TA]-\d+$/i.test(nilai)) $('#f-nama').value = namaBerikut(eksisting ? 'A' : 'T');
+  }
+  perbaruiPratinjauBiaya();
+}
+
 function bukaFormTiang(id, latlng) {
   editId = id;
   const pole = id ? state.poles.find(p => p.id === id) : null;
   draftLatLng = pole ? { lat: pole.lat, lng: pole.lng } : latlng;
   draftKonstruksi = pole ? pole.konstruksi : draftKonstruksi;
+  draftModeTitik = pole ? (pole.mode === 'eksisting' ? 'eksisting' : 'rencana') : draftModeTitik;
+  draftKondisi = pole ? (pole.kondisi || 'baik') : 'baik';
 
-  $('#f-judul').textContent = pole ? `Edit ${pole.nama}` : 'Taging Tiang Baru';
-  $('#f-nama').value = pole ? pole.nama : namaBerikut();
+  $('#f-judul').textContent = pole ? `Edit ${pole.nama}` : 'Taging Titik Baru';
+  $('#f-nama').value = pole ? pole.nama : namaBerikut(draftModeTitik === 'eksisting' ? 'A' : 'T');
   $('#f-lat').value = draftLatLng.lat.toFixed(6);
   $('#f-lng').value = draftLatLng.lng.toFixed(6);
   $('#f-tiang').value = pole ? pole.tiang : DEFAULT_TIANG;
@@ -405,7 +460,26 @@ function bukaFormTiang(id, latlng) {
     wa.appendChild(lbl);
   });
 
-  perbaruiPratinjauBiaya();
+  // isian aset eksisting: jenis aset + kondisi
+  $('#f-jenis-aset').innerHTML = Object.entries(JENIS_ASET)
+    .map(([kode, j]) => `<option value="${kode}" ${pole && pole.jenisAset === kode ? 'selected' : ''}>${j.ikon} ${j.nama}</option>`).join('');
+  const wk = $('#f-kondisi');
+  wk.innerHTML = '';
+  Object.entries(KONDISI).forEach(([kode, k]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.kondisi = kode;
+    b.textContent = k.nama;
+    b.className = kode === draftKondisi ? 'aktif' : '';
+    b.onclick = () => {
+      draftKondisi = kode;
+      wk.querySelectorAll('button').forEach(el => el.classList.toggle('aktif', el.dataset.kondisi === kode));
+      perbaruiPratinjauBiaya();
+    };
+    wk.appendChild(b);
+  });
+
+  terapkanModeForm();
   bukaModal('modal-tiang');
 }
 
@@ -414,12 +488,15 @@ function poleDariForm() {
   const kartuPilih = document.querySelector('#pilih-konstruksi .kartu-k.pilih');
   return {
     id: editId || idBerikut,
-    nama: $('#f-nama').value.trim() || `T-${idBerikut}`,
+    nama: $('#f-nama').value.trim() || `${draftModeTitik === 'eksisting' ? 'A' : 'T'}-${idBerikut}`,
     lat: parseFloat($('#f-lat').value),
     lng: parseFloat($('#f-lng').value),
+    mode: draftModeTitik,
     tiang: $('#f-tiang').value,
     konstruksi: (kartuPilih && kartuPilih.dataset.kode) || draftKonstruksi,
     aksesoris: [...document.querySelectorAll('#pilih-aksesoris input:checked')].map(i => i.value),
+    jenisAset: $('#f-jenis-aset').value || 'TIANG_TM',
+    kondisi: draftKondisi,
     catatan: $('#f-catatan').value.trim(),
   };
 }
@@ -427,6 +504,15 @@ function poleDariForm() {
 function perbaruiPratinjauBiaya() {
   const p = poleDariForm();
   if (isNaN(p.lat) || isNaN(p.lng)) return;
+  if (p.mode === 'eksisting') {
+    const j = JENIS_ASET[p.jenisAset] || { nama: '?' };
+    const kd = KONDISI[p.kondisi] || KONDISI.baik;
+    $('#f-pratinjau').innerHTML =
+      `<b>Aset Eksisting — ${j.nama}</b><br>
+       Kondisi: <b style="color:${kd.warna}">${kd.nama}</b><br>
+       <span style="font-size:11px">Tidak masuk RAB. Di fase M3, kondisi rusak otomatis membawa usulan perbaikan + RAB.</span>`;
+    return;
+  }
   const b = biayaPerTiang(p);
   const k = KONSTRUKSI[p.konstruksi];
   const rincian = Object.entries(b.bom)
@@ -452,7 +538,9 @@ function simpanTiangDariForm() {
   } else {
     state.poles.push(p);
     idBerikut++;
-    toast(`${p.nama} (${p.konstruksi}) tersimpan`);
+    toast(p.mode === 'eksisting'
+      ? `${p.nama} (${(JENIS_ASET[p.jenisAset] || {}).nama} — ${(KONDISI[p.kondisi] || {}).nama}) tersimpan`
+      : `${p.nama} (${p.konstruksi}) tersimpan`);
   }
   simpan(); render();
   tutupModal('modal-tiang');
@@ -587,8 +675,9 @@ function terimaPosisiLive(lat, lng, akurasi) {
     if (ikutiPeta) map.panTo([lat, lng]);
   }
 
-  // garis bantu putus-putus dari tiang terakhir ke posisi sekarang
-  const akhir = state.poles[state.poles.length - 1];
+  // garis bantu putus-putus dari tiang rencana terakhir ke posisi sekarang
+  const rencanaLive = polesRencana();
+  const akhir = rencanaLive[rencanaLive.length - 1];
   if (akhir) {
     const seg = [[akhir.lat, akhir.lng], [lat, lng]];
     if (!garisKeTiang) garisKeTiang = L.polyline(seg, { color: '#2e7d32', weight: 2, dashArray: '4 7' }).addTo(layerGps);
@@ -602,13 +691,14 @@ function terimaPosisiLive(lat, lng, akurasi) {
 }
 
 function perbaruiPanelLive() {
-  const akhir = state.poles[state.poles.length - 1];
+  const rencana = polesRencana();
+  const akhir = rencana[rencana.length - 1];
   const jarak = (akhir && posisiLive) ? haversine(akhir, posisiLive) : null;
   const elJarak = $('#lv-jarak');
   elJarak.textContent = jarak === null ? '—' : angka(jarak, 0) + ' m';
   elJarak.classList.toggle('ideal', jarak !== null && jarak >= 45 && jarak <= 65); // gawang ideal 45–65 m
   $('#lv-akurasi').textContent = posisiLive ? '±' + Math.round(posisiLive.akurasi) + ' m' : '—';
-  $('#lv-jumlah').textContent = state.poles.length;
+  $('#lv-jumlah').textContent = rencana.length;
 }
 
 // --- tanam cepat: pilih konstruksi = langsung tersimpan ---
@@ -661,7 +751,10 @@ function tanamCepat(kode) {
   if (!fix) return;
   const p = {
     id: idBerikut,
-    nama: namaBerikut(),
+    mode: 'rencana',
+    jenisAset: 'TIANG_TM',
+    kondisi: 'baik',
+    nama: namaBerikut('T'),
     lat: fix.lat,
     lng: fix.lng,
     tiang: $('#q-tiang').value,
@@ -718,7 +811,7 @@ function renderRAB() {
   html += `<div class="judul-seksi">C. Jasa Pemasangan</div>
     <div class="bungkus-tabel"><table class="rab">
       <tr><th>Uraian</th><th class="angka">Vol</th><th>Sat</th><th class="angka">Harga Satuan</th><th class="angka">Jumlah</th></tr>
-      <tr><td>${MATERIALS.JASA_TIANG.nama}</td><td class="angka">${state.poles.length}</td><td>tiang</td>
+      <tr><td>${MATERIALS.JASA_TIANG.nama}</td><td class="angka">${polesRencana().length}</td><td>tiang</td>
         <td class="angka">${rupiah(hargaEfektif('JASA_TIANG'))}</td><td class="angka">${rupiah(rab.jasaTiang)}</td></tr>
       <tr><td>${MATERIALS.JASA_TARIK.nama}</td><td class="angka">${angka(rab.rute / 1000, 2)}</td><td>km</td>
         <td class="angka">${rupiah(hargaEfektif('JASA_TARIK'))}</td><td class="angka">${rupiah(rab.jasaTarik)}</td></tr>
@@ -733,14 +826,15 @@ function renderRAB() {
     <p class="catatan-kecil">Harga konstruksi & pendukung sesuai Lampiran Harga Satuan JTM Tiang Besi UIW Maluku &amp; Maluku Utara.
     ⚠️ Harga <b>batang tiang</b> dan <b>penghantar</b> tidak ada di lampiran — masih contoh, sesuaikan di menu Pengaturan.</p>`;
 
-  // rincian per tiang
-  html += `<div class="judul-seksi">Rincian Per Tiang</div>`;
-  if (state.poles.length) {
+  // rincian per titik rencana
+  const rincianRencana = polesRencana();
+  html += `<div class="judul-seksi">Rincian Per Tiang (Rencana)</div>`;
+  if (rincianRencana.length) {
     html += `<div class="bungkus-tabel"><table class="rab">
       <tr><th>Tiang</th><th>Konstruksi</th><th class="angka">Jarak dari Sebelumnya</th><th class="angka">Kumulatif</th><th class="angka">Biaya Titik</th></tr>`;
     let kumulatif = 0;
-    state.poles.forEach((p, i) => {
-      const d = i === 0 ? 0 : haversine(state.poles[i - 1], p);
+    rincianRencana.forEach((p, i) => {
+      const d = i === 0 ? 0 : haversine(rincianRencana[i - 1], p);
       kumulatif += d;
       html += `<tr><td>${p.nama}</td><td>${p.konstruksi} — ${(KONSTRUKSI[p.konstruksi] || {}).nama || ''}</td>
         <td class="angka">${i === 0 ? '—' : angka(d, 0) + ' m'}</td>
@@ -748,6 +842,15 @@ function renderRAB() {
         <td class="angka">${rupiah(biayaPerTiang(p).total)}</td></tr>`;
     });
     html += `</table></div>`;
+  }
+
+  // catatan aset eksisting
+  const eksisting = state.poles.filter(p => p.mode === 'eksisting');
+  if (eksisting.length) {
+    const rusak = eksisting.filter(p => p.kondisi !== 'baik').length;
+    html += `<div class="judul-seksi">Aset Eksisting Tersurvey</div>
+      <p class="catatan-kecil">${eksisting.length} aset tersurvey, <b>${rusak} dalam kondisi rusak</b> —
+      lihat detail di menu 📋 Titik. Usulan perbaikan otomatis + RAB-nya hadir di fase M3.</p>`;
   }
 
   $('#isi-rab').innerHTML = html;
@@ -763,16 +866,21 @@ function renderDaftarTiang() {
   }
   wadah.innerHTML = '';
   state.poles.forEach((p, i) => {
-    const k = KONSTRUKSI[p.konstruksi] || { warna: '#555', nama: '?' };
-    const d = i === 0 ? null : haversine(state.poles[i - 1], p);
+    const eksisting = p.mode === 'eksisting';
+    const k = eksisting
+      ? { warna: (KONDISI[p.kondisi] || KONDISI.baik).warna, nama: `${(JENIS_ASET[p.jenisAset] || {}).nama || '?'} · ${(KONDISI[p.kondisi] || {}).nama || ''}` }
+      : (KONSTRUKSI[p.konstruksi] || { warna: '#555', nama: '?' });
+    const sebelum = polesRencana();
+    const idxR = sebelum.indexOf(p);
+    const d = (eksisting || idxR <= 0) ? null : haversine(sebelum[idxR - 1], p);
     const div = document.createElement('div');
     div.className = 'item-tiang';
     div.innerHTML = `
-      <div class="bulat" style="background:${k.warna}">${p.konstruksi.replace('TM-', 'TM')}</div>
+      <div class="bulat" style="background:${k.warna}">${eksisting ? 'ASET' : p.konstruksi.replace('TM-', 'TM')}</div>
       <div class="isi">
         <div class="nm">${p.nama} — ${k.nama}</div>
         <div class="dt">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
-          ${d !== null ? ` · gawang ${angka(d, 0)} m` : ' · titik awal'}
+          ${eksisting ? '' : (d !== null ? ` · gawang ${angka(d, 0)} m` : ' · titik awal')}
           ${p.catatan ? ' · ' + p.catatan : ''}</div>
       </div>
       <div class="aksi">
@@ -878,7 +986,8 @@ function eksporCSV() {
   const B = [];
   const baris = (...kolom) => B.push(kolom.join(';'));
 
-  baris('RAB SURVEY JARINGAN TM');
+  baris('CAKRA - RAB SURVEY JARINGAN TM');
+  baris('Cepat - Tepat - Akurat');
   baris('Tanggal ekspor', new Date().toLocaleString('id-ID'));
   baris('');
   baris('A. REKAP MATERIAL & JASA KONSTRUKSI (Lampiran UIW Maluku & Maluku Utara - Tiang Besi)');
@@ -898,11 +1007,12 @@ function eksporCSV() {
   baris(`PPN ${s.ppnAktif ? s.ppnPersen + '%' : '0%'}`, '', '', '', Math.round(rab.ppn));
   baris('GRAND TOTAL', '', '', '', Math.round(rab.grandTotal));
   baris('');
-  baris('RINCIAN PER TIANG');
+  baris('RINCIAN PER TIANG (RENCANA)');
   baris('Nama', 'Konstruksi', 'Jenis Tiang', 'Latitude', 'Longitude', 'Jarak dari sebelumnya (m)', 'Kumulatif (m)', 'Aksesoris', 'Catatan', 'Biaya Titik');
+  const rencanaCSV = polesRencana();
   let kumulatif = 0;
-  state.poles.forEach((p, i) => {
-    const d = i === 0 ? 0 : haversine(state.poles[i - 1], p);
+  rencanaCSV.forEach((p, i) => {
+    const d = i === 0 ? 0 : haversine(rencanaCSV[i - 1], p);
     kumulatif += d;
     baris(p.nama.replace(/;/g, ','), p.konstruksi, MATERIALS[p.tiang].nama, p.lat, p.lng,
       Math.round(d), Math.round(kumulatif),
@@ -911,32 +1021,53 @@ function eksporCSV() {
       Math.round(biayaPerTiang(p).total));
   });
 
-  unduh('RAB-Survey-TM.csv', '﻿' + B.join('\n'), 'text/csv;charset=utf-8');
+  const eksistingCSV = state.poles.filter(p => p.mode === 'eksisting');
+  if (eksistingCSV.length) {
+    baris('');
+    baris('DAFTAR ASET EKSISTING TERSURVEY');
+    baris('Nama', 'Jenis Aset', 'Kondisi', 'Latitude', 'Longitude', 'Catatan');
+    eksistingCSV.forEach(p => baris(
+      p.nama.replace(/;/g, ','),
+      (JENIS_ASET[p.jenisAset] || {}).nama || p.jenisAset,
+      (KONDISI[p.kondisi] || {}).nama || p.kondisi,
+      p.lat, p.lng,
+      (p.catatan || '').replace(/;/g, ',')));
+  }
+
+  unduh('CAKRA-RAB-Survey.csv', '﻿' + B.join('\n'), 'text/csv;charset=utf-8');
   toast('RAB diekspor ke CSV (buka di Excel)');
 }
 
 function eksporKML() {
   const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  let plek = state.poles.map(p => `
-    <Placemark><name>${esc(p.nama)} (${p.konstruksi})</name>
-      <description>${esc((KONSTRUKSI[p.konstruksi] || {}).nama || '')} — ${esc(MATERIALS[p.tiang].nama)}${p.catatan ? ' — ' + esc(p.catatan) : ''}</description>
+  let plek = state.poles.map(p => {
+    const eksisting = p.mode === 'eksisting';
+    const label = eksisting ? (JENIS_ASET[p.jenisAset] || {}).nama || 'Aset' : p.konstruksi;
+    const desk = eksisting
+      ? `Aset eksisting — Kondisi: ${(KONDISI[p.kondisi] || {}).nama || ''}${p.catatan ? ' — ' + p.catatan : ''}`
+      : `${(KONSTRUKSI[p.konstruksi] || {}).nama || ''} — ${MATERIALS[p.tiang].nama}${p.catatan ? ' — ' + p.catatan : ''}`;
+    return `
+    <Placemark><name>${esc(p.nama)} (${esc(label)})</name>
+      <description>${esc(desk)}</description>
       <Point><coordinates>${p.lng},${p.lat},0</coordinates></Point>
-    </Placemark>`).join('');
-  if (state.poles.length > 1) {
+    </Placemark>`;
+  }).join('');
+  const rencanaKML = polesRencana();
+  if (rencanaKML.length > 1) {
     plek += `
-    <Placemark><name>Rute Jaringan TM</name>
-      <LineString><coordinates>${state.poles.map(p => `${p.lng},${p.lat},0`).join(' ')}</coordinates></LineString>
+    <Placemark><name>Rute Rencana Jaringan TM</name>
+      <LineString><coordinates>${rencanaKML.map(p => `${p.lng},${p.lat},0`).join(' ')}</coordinates></LineString>
     </Placemark>`;
   }
   const kml = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Survey Jaringan TM</name>${plek}
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>CAKRA — Survey Aset Distribusi</name>${plek}
 </Document></kml>`;
-  unduh('Survey-TM.kml', kml, 'application/vnd.google-earth.kml+xml');
+  unduh('CAKRA-Survey.kml', kml, 'application/vnd.google-earth.kml+xml');
   toast('Diekspor ke KML (buka di Google Earth)');
 }
 
 function eksporJSON() {
-  unduh('Proyek-Survey-TM.json', JSON.stringify({ poles: state.poles, settings: state.settings }, null, 2), 'application/json');
+  unduh('CAKRA-Proyek.json', JSON.stringify({ poles: state.poles, settings: state.settings }, null, 2), 'application/json');
   toast('Proyek disimpan sebagai file JSON');
 }
 
@@ -1021,9 +1152,13 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btn-pengaturan').onclick = renderPengaturan;
   $('#btn-ekspor').onclick = () => bukaModal('modal-ekspor');
 
-  // form tiang
+  // form titik
   $('#f-simpan').onclick = simpanTiangDariForm;
   $('#f-tiang').onchange = perbaruiPratinjauBiaya;
+  $('#f-jenis-aset').onchange = perbaruiPratinjauBiaya;
+  document.querySelectorAll('#f-mode button').forEach(b => {
+    b.onclick = () => { draftModeTitik = b.dataset.mode; terapkanModeForm(); };
+  });
 
   // pengaturan
   $('#s-simpan').onclick = simpanPengaturan;

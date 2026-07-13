@@ -1,7 +1,7 @@
 {
-  "name": "Survey Taging TM — RAB Otomatis",
-  "short_name": "Survey TM",
-  "description": "Aplikasi survey taging tiang TM (SUTM 20 kV) dengan RAB otomatis. Bisa dipakai offline — GPS HP tetap berfungsi tanpa sinyal data.",
+  "name": "CAKRA — Cerdas Analisis Kebutuhan Rencana Aset",
+  "short_name": "CAKRA",
+  "description": "Cepat • Tepat • Akurat — survey aset distribusi PLN dalam satu genggaman: taging GPS, kondisi aset, kebutuhan material otomatis, RAB akurat & terinci. Bekerja offline.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

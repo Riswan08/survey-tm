@@ -230,6 +230,24 @@ const AKSESORIS = {
 };
 
 // ------------------------------------------------------------
+// ASET EKSISTING (mode survey kondisi — fondasi usulan perbaikan)
+// ------------------------------------------------------------
+const JENIS_ASET = {
+  TIANG_TM:   { nama: 'Tiang TM',                 ikon: '🗼' },
+  GARDU:      { nama: 'Gardu Distribusi',         ikon: '🏠' },
+  PENGHANTAR: { nama: 'Penghantar / Seksi Jaringan', ikon: '➿' },
+  PENGAMAN:   { nama: 'Pengaman (Arrester / FCO)', ikon: '🛡️' },
+  GROUNDING:  { nama: 'Grounding / Pentanahan',   ikon: '⏚' },
+  ROW:        { nama: 'ROW / Pohon Dekat Jaringan', ikon: '🌳' },
+};
+
+const KONDISI = {
+  baik:        { nama: 'Baik',         warna: '#2e7d32' },
+  rusakRingan: { nama: 'Rusak Ringan', warna: '#f57c00' },
+  rusakBerat:  { nama: 'Rusak Berat',  warna: '#e53935' },
+};
+
+// ------------------------------------------------------------
 // PENGATURAN BAWAAN
 // ------------------------------------------------------------
 const DEFAULT_SETTINGS = {
