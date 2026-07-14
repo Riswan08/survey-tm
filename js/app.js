@@ -95,6 +95,8 @@ function normalisasiPole(p, indeks) {
     uid: (typeof p.uid === 'string' && p.uid.length >= 3) ? p.uid.slice(0, 40) : `${DEVICE_ID}-${p.id || indeks + 1}-${indeks}`,
     petugas: typeof p.petugas === 'string' ? p.petugas.slice(0, 40) : '',
     diubah: isFinite(p.diubah) ? Number(p.diubah) : 0,
+    // sambungan jaringan eksisting: uid tiang tetangga (garis kabel di peta)
+    sambung: Array.isArray(p.sambung) ? p.sambung.filter(s => typeof s === 'string' && s.length >= 3).slice(0, 8) : [],
   };
 }
 
@@ -199,7 +201,7 @@ function periksaGawang(p, kecualiId) {
 let map, layerTiang, layerGaris, layerGps;
 
 function initPeta() {
-  map = L.map('map', { zoomControl: false }).setView([-3.3, 128.95], 13); // sekitar Masohi
+  map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([-3.3, 128.95], 13); // sekitar Masohi
   L.control.zoom({ position: 'topleft' }).addTo(map);
 
   // CARTO Voyager: gaya bersih ala Google Maps, gratis tanpa API key
@@ -324,8 +326,31 @@ function render() {
     }
   }
 
-  // marker tiang (bisa digeser)
+  // garis jaringan eksisting: bentangan kabel antar tiang (pole.sambung berisi uid tetangga)
+  const petaUid = new Map(state.poles.map(p => [p.uid, p]));
+  const segmen = [];
+  state.poles.forEach(p => {
+    (p.sambung || []).forEach(uidLain => {
+      const q = petaUid.get(uidLain);
+      if (q) segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
+    });
+  });
+  if (segmen.length) {
+    L.polyline(segmen, { color: '#546e7a', weight: 2.5, opacity: .85 }).addTo(layerGaris);
+  }
+
+  // marker tiang — jika aset eksisting sangat banyak (impor massal), pakai titik
+  // kanvas yang ringan agar peta tetap lancar di HP
+  const jumlahEksisting = state.poles.filter(p => p.mode === 'eksisting').length;
+  const modeRingan = jumlahEksisting > 300;
   state.poles.forEach((pole, idx) => {
+    if (modeRingan && pole.mode === 'eksisting') {
+      const warna = (KONDISI[pole.kondisi] || KONDISI.baik).warna;
+      L.circleMarker([pole.lat, pole.lng], { radius: 4.5, weight: 1.5, color: '#fff', fillColor: warna, fillOpacity: 1 })
+        .bindPopup(() => popupTiang(pole))
+        .addTo(layerTiang);
+      return;
+    }
     const m = L.marker([pole.lat, pole.lng], { icon: ikonTiang(pole, idx), draggable: true });
     m.on('dragend', (e) => {
       const ll = e.target.getLatLng();
@@ -1107,7 +1132,12 @@ function renderDaftarTiang() {
     return;
   }
   wadah.innerHTML = '';
-  state.poles.forEach((p, i) => {
+  const BATAS_TAMPIL = 400;
+  if (state.poles.length > BATAS_TAMPIL) {
+    wadah.innerHTML = `<p class="catatan-kecil">Menampilkan ${BATAS_TAMPIL} dari ${state.poles.length} titik —
+      titik lainnya tetap tampil di peta (ketuk markernya untuk edit/hapus).</p>`;
+  }
+  state.poles.slice(0, BATAS_TAMPIL).forEach((p, i) => {
     const eksisting = p.mode === 'eksisting';
     const k = eksisting
       ? { warna: (KONDISI[p.kondisi] || KONDISI.baik).warna, nama: `${(JENIS_ASET[p.jenisAset] || {}).nama || '?'} · ${(KONDISI[p.kondisi] || {}).nama || ''}` }

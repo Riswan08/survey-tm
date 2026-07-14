@@ -61,6 +61,7 @@ function rapikan(p, i) {
     petugas: typeof p.petugas === 'string' ? p.petugas.slice(0, 40) : '',
     catatan: typeof p.catatan === 'string' ? p.catatan.slice(0, 300) : '',
     diubah: isFinite(p.diubah) ? Number(p.diubah) : 0,
+    sambung: Array.isArray(p.sambung) ? p.sambung.filter(s => typeof s === 'string' && s.length >= 3).slice(0, 8) : [],
     // dibawa apa adanya agar unduhan JSON gabungan tetap lengkap utk aplikasi survey
     id: p.id, tiang: p.tiang, aksesoris: p.aksesoris, temuan: p.temuan,
   };
@@ -84,7 +85,7 @@ function gabung(masuk) {
 let peta, layerTitik, sudahFit = false;
 
 function initPeta() {
-  peta = L.map('peta-dasbor').setView([-3.3, 128.95], 11);
+  peta = L.map('peta-dasbor', { preferCanvas: true }).setView([-3.3, 128.95], 11);
   const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
     { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO' });
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
@@ -112,6 +113,16 @@ function popupHTML(p) {
 
 function renderPeta() {
   layerTitik.clearLayers();
+  // garis jaringan eksisting antar tiang
+  const petaUid = new Map(poles.map(p => [p.uid, p]));
+  const segmen = [];
+  poles.forEach(p => {
+    (p.sambung || []).forEach(uidLain => {
+      const q = petaUid.get(uidLain);
+      if (q) segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
+    });
+  });
+  if (segmen.length) L.polyline(segmen, { color: '#546e7a', weight: 2.5, opacity: .85 }).addTo(layerTitik);
   poles.forEach(p => {
     const warna = p.mode === 'eksisting'
       ? (KONDISI[p.kondisi] || KONDISI.baik).warna
