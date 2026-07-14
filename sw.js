@@ -9,7 +9,7 @@
      SW), jadi taging offline aman.
    ============================================================ */
 
-const VERSI = 'v7';
+const VERSI = 'v8';
 const CACHE_APP = 'stm-app-' + VERSI;
 const CACHE_TILE = 'stm-tiles-v1';
 const MAKS_TILE = 4000; // batas jumlah tile tersimpan
@@ -17,11 +17,11 @@ const MAKS_TILE = 4000; // batas jumlah tile tersimpan
 const ASET_APP = [
   './',
   './index.html',
-  './css/style.css?v=7',
-  './js/data.js?v=7',
-  './js/app.js?v=7',
+  './css/style.css?v=8',
+  './js/data.js?v=8',
+  './js/app.js?v=8',
   './dasbor.html',
-  './js/dasbor.js?v=7',
+  './js/dasbor.js?v=8',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/images/layers.png',
@@ -34,7 +34,7 @@ const ASET_APP = [
   './manifest.json',
 ];
 
-const HOST_TILE = ['tile.openstreetmap.org', 'server.arcgisonline.com'];
+const HOST_TILE = ['tile.openstreetmap.org', 'server.arcgisonline.com', 'basemaps.cartocdn.com'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

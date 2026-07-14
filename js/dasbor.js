@@ -85,10 +85,12 @@ let peta, layerTitik, sudahFit = false;
 
 function initPeta() {
   peta = L.map('peta-dasbor').setView([-3.3, 128.95], 11);
-  const jalan = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
+  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+    { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO' });
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
   const satelit = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri' });
-  jalan.addTo(peta);
-  L.control.layers({ 'Peta Jalan': jalan, 'Satelit': satelit }).addTo(peta);
+  voyager.addTo(peta);
+  L.control.layers({ 'Peta Jalan': voyager, 'OpenStreetMap': osm, 'Satelit': satelit }).addTo(peta);
   layerTitik = L.layerGroup().addTo(peta);
 }
 

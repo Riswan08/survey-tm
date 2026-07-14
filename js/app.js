@@ -202,21 +202,27 @@ function initPeta() {
   map = L.map('map', { zoomControl: false }).setView([-3.3, 128.95], 13); // sekitar Masohi
   L.control.zoom({ position: 'topleft' }).addTo(map);
 
-  const jalan = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // CARTO Voyager: gaya bersih ala Google Maps, gratis tanpa API key
+  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+    maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO',
+  });
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap',
   });
   const satelit = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     { maxZoom: 19, attribution: 'Esri World Imagery' }
   );
-  jalan.addTo(map);
-  L.control.layers({ 'Peta Jalan': jalan, 'Satelit': satelit }, null, { position: 'topleft' }).addTo(map);
+  voyager.addTo(map);
+  L.control.layers({ 'Peta Jalan': voyager, 'OpenStreetMap': osm, 'Satelit': satelit }, null, { position: 'topleft' }).addTo(map);
 
   layerGaris = L.layerGroup().addTo(map);
   layerTiang = L.layerGroup().addTo(map);
   layerGps = L.layerGroup().addTo(map);
 
-  map.on('baselayerchange', (e) => { tileAktif = e.name === 'Satelit' ? 'esri' : 'osm'; });
+  map.on('baselayerchange', (e) => {
+    tileAktif = e.name === 'Satelit' ? 'esri' : (e.name === 'OpenStreetMap' ? 'osm' : 'carto');
+  });
   map.on('click', (e) => {
     if (modeTaging) bukaFormTiang(null, e.latlng);
   });
@@ -225,7 +231,7 @@ function initPeta() {
 // ---------------- PETA OFFLINE ----------------
 // Unduh tile area yang sedang tampil ke Cache Storage — dipakai
 // service worker saat offline. GPS & taging tetap jalan tanpa tile.
-let tileAktif = 'osm';
+let tileAktif = 'carto';
 
 function latLng2Tile(lat, lng, z) {
   const n = 2 ** z;
@@ -240,8 +246,13 @@ function urlTile(x, y, z) {
   if (tileAktif === 'esri') {
     return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
   }
-  const s = ['a', 'b', 'c'][Math.abs(x + y) % 3]; // subdomain sama dengan pilihan Leaflet → cache pasti kena
-  return `https://${s}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
+  // subdomain dihitung sama persis dengan cara Leaflet → cache offline pasti kena
+  if (tileAktif === 'osm') {
+    const s = ['a', 'b', 'c'][Math.abs(x + y) % 3];
+    return `https://${s}.tile.openstreetmap.org/${z}/${x}/${y}.png`;
+  }
+  const s = ['a', 'b', 'c', 'd'][Math.abs(x + y) % 4];
+  return `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
 }
 
 async function unduhTileArea() {
