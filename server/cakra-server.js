@@ -68,6 +68,20 @@ function gabung(lama, masuk) {
   return { poles: [...peta.values()], baru, diperbarui };
 }
 
+// gabung koreksi sambungan antar tiang: per pasangan, `diubah` terbaru menang
+function gabungKoreksi(lama, masuk) {
+  const kunci = (k) => (k.a < k.b ? k.a + '|' + k.b : k.b + '|' + k.a);
+  const peta = new Map();
+  (lama || []).forEach(k => { if (k && k.a && k.b) peta.set(kunci(k), k); });
+  (Array.isArray(masuk) ? masuk : []).forEach(k => {
+    if (!k || typeof k.a !== 'string' || typeof k.b !== 'string') return;
+    if (k.aksi !== 'tambah' && k.aksi !== 'hapus') return;
+    const ada = peta.get(kunci(k));
+    if (!ada || (Number(k.diubah) || 0) > (Number(ada.diubah) || 0)) peta.set(kunci(k), k);
+  });
+  return [...peta.values()];
+}
+
 function kirimJSON(res, kode, obj) {
   const isi = JSON.stringify(obj);
   res.writeHead(kode, {
@@ -112,7 +126,7 @@ http.createServer((req, res) => {
 
     if (req.method === 'GET' && url.startsWith('/api/data')) {
       const d = bacaUnit(kode);
-      kirimJSON(res, 200, { poles: d.poles, diperbarui: d.diperbarui });
+      kirimJSON(res, 200, { poles: d.poles, koreksi: d.koreksi || [], diperbarui: d.diperbarui });
       return;
     }
 
@@ -127,9 +141,10 @@ http.createServer((req, res) => {
           const masuk = JSON.parse(body);
           const lama = bacaUnit(kode);
           const hasil = gabung(lama.poles, masuk.poles);
-          tulisUnit(kode, { poles: hasil.poles, diperbarui: Date.now() });
-          console.log(`[sync] ${kode}: +${hasil.baru} baru, ${hasil.diperbarui} diperbarui, total ${hasil.poles.length}`);
-          kirimJSON(res, 200, { total: hasil.poles.length, baru: hasil.baru, diperbarui: hasil.diperbarui });
+          const koreksi = gabungKoreksi(lama.koreksi, masuk.koreksi);
+          tulisUnit(kode, { poles: hasil.poles, koreksi, diperbarui: Date.now() });
+          console.log(`[sync] ${kode}: +${hasil.baru} baru, ${hasil.diperbarui} diperbarui, total ${hasil.poles.length}, koreksi ${koreksi.length}`);
+          kirimJSON(res, 200, { total: hasil.poles.length, baru: hasil.baru, diperbarui: hasil.diperbarui, koreksi: koreksi.length });
         } catch (e) {
           kirimJSON(res, 400, { error: 'JSON tidak valid' });
         }

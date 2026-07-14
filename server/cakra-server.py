@@ -73,6 +73,23 @@ def gabung(lama, masuk):
     return list(peta.values()), baru, diperbarui
 
 
+def gabung_koreksi(lama, masuk):
+    """Koreksi sambungan antar tiang: per pasangan, `diubah` terbaru menang."""
+    def kunci(k):
+        return (k['a'] + '|' + k['b']) if k['a'] < k['b'] else (k['b'] + '|' + k['a'])
+    peta = {kunci(k): k for k in (lama or [])
+            if isinstance(k, dict) and isinstance(k.get('a'), str) and isinstance(k.get('b'), str)}
+    for k in (masuk if isinstance(masuk, list) else []):
+        if not isinstance(k, dict) or not isinstance(k.get('a'), str) or not isinstance(k.get('b'), str):
+            continue
+        if k.get('aksi') not in ('tambah', 'hapus'):
+            continue
+        ada = peta.get(kunci(k))
+        if ada is None or (k.get('diubah') or 0) > (ada.get('diubah') or 0):
+            peta[kunci(k)] = k
+    return list(peta.values())
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, kode, obj):
         isi = json.dumps(obj).encode()
@@ -94,7 +111,7 @@ class Handler(BaseHTTPRequestHandler):
             if not kode_valid(kode):
                 return self._json(401, {'error': 'kode unit tidak valid'})
             d = baca_unit(kode)
-            return self._json(200, {'poles': d.get('poles', []), 'diperbarui': d.get('diperbarui', 0)})
+            return self._json(200, {'poles': d.get('poles', []), 'koreksi': d.get('koreksi', []), 'diperbarui': d.get('diperbarui', 0)})
         # sajikan file aplikasi
         rel = self.path.split('?')[0]
         if rel == '/':
@@ -126,9 +143,10 @@ class Handler(BaseHTTPRequestHandler):
             masuk = json.loads(self.rfile.read(panjang))
             lama = baca_unit(kode)
             poles, baru, diperbarui = gabung(lama.get('poles', []), masuk.get('poles'))
-            tulis_unit(kode, {'poles': poles, 'diperbarui': int(time.time() * 1000)})
-            print(f"[sync] {kode}: +{baru} baru, {diperbarui} diperbarui, total {len(poles)}")
-            self._json(200, {'total': len(poles), 'baru': baru, 'diperbarui': diperbarui})
+            koreksi = gabung_koreksi(lama.get('koreksi', []), masuk.get('koreksi'))
+            tulis_unit(kode, {'poles': poles, 'koreksi': koreksi, 'diperbarui': int(time.time() * 1000)})
+            print(f"[sync] {kode}: +{baru} baru, {diperbarui} diperbarui, total {len(poles)}, koreksi {len(koreksi)}")
+            self._json(200, {'total': len(poles), 'baru': baru, 'diperbarui': diperbarui, 'koreksi': len(koreksi)})
         except (ValueError, KeyError):
             self._json(400, {'error': 'JSON tidak valid'})
 

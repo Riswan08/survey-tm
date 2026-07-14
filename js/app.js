@@ -19,6 +19,7 @@ const DEVICE_ID = (() => {
 
 let state = {
   poles: [],                 // {id, nama, lat, lng, tiang, konstruksi, aksesoris:[], catatan}
+  koreksi: [],               // koreksi sambungan: {a, b, aksi: 'tambah'|'hapus', diubah, petugas}
   settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
 };
 let idBerikut = 1;
@@ -60,7 +61,7 @@ function toast(pesan) {
 
 function simpan() {
   try {
-    localStorage.setItem(KUNCI_SIMPAN, JSON.stringify({ poles: state.poles, settings: state.settings, idBerikut }));
+    localStorage.setItem(KUNCI_SIMPAN, JSON.stringify({ poles: state.poles, koreksi: state.koreksi, settings: state.settings, idBerikut }));
   } catch (e) {
     toast('⚠️ Penyimpanan HP hampir penuh — hapus sebagian foto atau ekspor proyek ke JSON');
   }
@@ -125,10 +126,24 @@ function warnaSkor(skor) {
 // titik rencana = rantai jaringan yang dihitung RAB & jaraknya; aset eksisting terpisah
 const polesRencana = () => state.poles.filter(p => p.mode !== 'eksisting');
 
+function normalisasiKoreksi(daftar) {
+  return (Array.isArray(daftar) ? daftar : [])
+    .filter(k => k && typeof k.a === 'string' && typeof k.b === 'string' &&
+      k.a.length >= 3 && k.b.length >= 3 && k.a !== k.b &&
+      (k.aksi === 'tambah' || k.aksi === 'hapus'))
+    .slice(0, 5000)
+    .map(k => ({
+      a: k.a.slice(0, 40), b: k.b.slice(0, 40), aksi: k.aksi,
+      diubah: isFinite(k.diubah) ? Number(k.diubah) : 0,
+      petugas: typeof k.petugas === 'string' ? k.petugas.slice(0, 40) : '',
+    }));
+}
+
 function normalisasiState(d) {
   const bawaan = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-  const hasil = { poles: [], settings: bawaan };
+  const hasil = { poles: [], koreksi: [], settings: bawaan };
   if (!d || typeof d !== 'object') return hasil;
+  hasil.koreksi = normalisasiKoreksi(d.koreksi);
 
   const idTerpakai = new Set();
   (Array.isArray(d.poles) ? d.poles : []).forEach((p, i) => {
@@ -167,6 +182,7 @@ function muat() {
   try { d = JSON.parse(localStorage.getItem(KUNCI_SIMPAN)); } catch (e) { /* data rusak → mulai kosong */ }
   const bersih = normalisasiState(d);
   state.poles = bersih.poles;
+  state.koreksi = bersih.koreksi;
   state.settings = bersih.settings;
   idBerikut = Math.max(0, ...state.poles.map(p => p.id)) + 1;
 }
@@ -250,7 +266,7 @@ async function muatAsetStatis() {
     const d = await res.json();
     asetStatis = (Array.isArray(d.poles) ? d.poles : [])
       .filter(p => p && typeof p.uid === 'string' && isFinite(p.lat) && isFinite(p.lng));
-    renderAsetStatis();
+    render(); // gambar ulang termasuk garis jaringan aset + koreksi
     // pemakaian pertama (belum ada titik survey): fokuskan peta ke wilayah aset
     if (asetStatis.length && !state.poles.length) {
       map.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
@@ -263,24 +279,15 @@ function renderAsetStatis() {
   layerAset.clearLayers();
   if (!asetStatis.length) return;
 
-  // garis kabel antar tiang aset
-  const petaUid = new Map(asetStatis.map(p => [p.uid, p]));
-  const segmen = [];
-  asetStatis.forEach(p => {
-    (p.sambung || []).forEach(u => {
-      const q = petaUid.get(u);
-      if (q) segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
-    });
-  });
-  if (segmen.length) L.polyline(segmen, { color: '#78909c', weight: 2, opacity: .8 }).addTo(layerAset);
-
-  // marker tiang aset — yang sudah dijadikan titik survey tampil dari layer utama saja
+  // marker tiang aset — garis kabel digambar terpadu di render() (termasuk koreksi);
+  // yang sudah dijadikan titik survey tampil dari layer utama saja
   const uidTersurvey = new Set(state.poles.map(p => p.uid));
   asetStatis.forEach(p => {
     if (uidTersurvey.has(p.uid)) return;
-    L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#78909c', fillOpacity: .95 })
-      .bindPopup(() => popupAsetStatis(p))
+    const cm = L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#78909c', fillOpacity: .95 })
       .addTo(layerAset);
+    if (modeKoreksi) cm.on('click', () => pilihKoreksi(p.uid));
+    else cm.bindPopup(() => popupAsetStatis(p));
   });
 }
 
@@ -305,6 +312,91 @@ function popupAsetStatis(p) {
     toast(`${n.nama} siap disurvey — isi kondisi & temuannya`);
   };
   return div;
+}
+
+// ---------------- SAMBUNGAN JARINGAN (gabungan + koreksi) ----------------
+// Sumber garis kabel: sambung milik aset bawaan + sambung milik titik survey,
+// lalu ditimpa daftar koreksi (tambah/putus). Titik survey ber-uid sama
+// menggantikan aset bawaan (termasuk daftar sambungnya).
+const kunciPasangan = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+
+function posisiSemua() {
+  const m = new Map();
+  asetStatis.forEach(p => m.set(p.uid, p));
+  state.poles.forEach(p => m.set(p.uid, p));
+  return m;
+}
+
+function sambunganFinal() {
+  const posisi = posisiSemua();
+  const tersurvey = new Set(state.poles.map(p => p.uid));
+  const edges = new Map();
+  const tambah = (uidA, uidB) => {
+    if (uidA !== uidB && posisi.has(uidA) && posisi.has(uidB)) edges.set(kunciPasangan(uidA, uidB), [uidA, uidB]);
+  };
+  asetStatis.forEach(p => { if (!tersurvey.has(p.uid)) (p.sambung || []).forEach(u => tambah(p.uid, u)); });
+  state.poles.forEach(p => (p.sambung || []).forEach(u => tambah(p.uid, u)));
+  (state.koreksi || []).forEach(k => {
+    if (k.aksi === 'hapus') edges.delete(kunciPasangan(k.a, k.b));
+    else tambah(k.a, k.b);
+  });
+  return { edges, posisi };
+}
+
+// ---------------- MODE KOREKSI SAMBUNGAN ----------------
+// Ketuk dua tiang: belum tersambung → disambung; sudah tersambung → diputus.
+let modeKoreksi = false, koreksiPilihan = null, tandaPilihan = null;
+
+function batalPilihKoreksi() {
+  koreksiPilihan = null;
+  if (tandaPilihan) { map.removeLayer(tandaPilihan); tandaPilihan = null; }
+}
+
+function toggleModeKoreksi() {
+  modeKoreksi = !modeKoreksi;
+  if (modeKoreksi && modeTaging) { modeTaging = false; $('#btn-tag').classList.remove('aktif'); $('#btn-tag').innerHTML = '🎯 Mode Taging'; }
+  batalPilihKoreksi();
+  $('#btn-koreksi').classList.toggle('aktif', modeKoreksi);
+  $('#btn-koreksi').innerHTML = modeKoreksi ? '🔗 Koreksi: AKTIF' : '🔗 Koreksi Sambungan';
+  render();
+  toast(modeKoreksi
+    ? 'Mode koreksi — ketuk tiang pertama, lalu tiang kedua (sambung / putus)'
+    : 'Mode koreksi dimatikan');
+}
+
+function pilihKoreksi(uid) {
+  const posisi = posisiSemua();
+  const p = posisi.get(uid);
+  if (!p) return;
+
+  if (!koreksiPilihan) {
+    koreksiPilihan = uid;
+    tandaPilihan = L.circleMarker([p.lat, p.lng], { radius: 12, color: '#ffd400', weight: 4, fill: false }).addTo(map);
+    toast(`${p.nama} dipilih — ketuk tiang kedua`);
+    return;
+  }
+  if (koreksiPilihan === uid) { batalPilihKoreksi(); toast('Pilihan dibatalkan'); return; }
+
+  const q = posisi.get(koreksiPilihan);
+  const { edges } = sambunganFinal();
+  const sudahTersambung = edges.has(kunciPasangan(uid, koreksiPilihan));
+  const d = haversine(p, q);
+  const ok = sudahTersambung
+    ? confirm(`✂️ Putuskan sambungan ${q.nama} — ${p.nama} (${angka(d, 0)} m)?`)
+    : confirm(`🔗 Sambungkan ${q.nama} — ${p.nama}?\nJarak ${angka(d, 0)} m${d > 300 ? ' — cukup jauh, pastikan memang satu bentangan.' : ''}`);
+  if (ok) {
+    const kk = kunciPasangan(uid, koreksiPilihan);
+    state.koreksi = (state.koreksi || []).filter(k => kunciPasangan(k.a, k.b) !== kk);
+    state.koreksi.push({
+      a: koreksiPilihan, b: uid,
+      aksi: sudahTersambung ? 'hapus' : 'tambah',
+      diubah: Date.now(),
+      petugas: state.settings.petugas || '',
+    });
+    simpan(); render();
+    toast(sudahTersambung ? '✂️ Sambungan diputus' : '🔗 Tiang tersambung');
+  }
+  batalPilihKoreksi();
 }
 
 // ---------------- PETA OFFLINE ----------------
@@ -403,14 +495,12 @@ function render() {
     }
   }
 
-  // garis jaringan eksisting: bentangan kabel antar tiang (pole.sambung berisi uid tetangga)
-  const petaUid = new Map(state.poles.map(p => [p.uid, p]));
+  // garis jaringan eksisting: aset bawaan + titik survey + koreksi sambungan
+  const jaringan = sambunganFinal();
   const segmen = [];
-  state.poles.forEach(p => {
-    (p.sambung || []).forEach(uidLain => {
-      const q = petaUid.get(uidLain);
-      if (q) segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
-    });
+  jaringan.edges.forEach(([a, b]) => {
+    const p = jaringan.posisi.get(a), q = jaringan.posisi.get(b);
+    segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
   });
   if (segmen.length) {
     L.polyline(segmen, { color: '#546e7a', weight: 2.5, opacity: .85 }).addTo(layerGaris);
@@ -423,12 +513,13 @@ function render() {
   state.poles.forEach((pole, idx) => {
     if (modeRingan && pole.mode === 'eksisting') {
       const warna = (KONDISI[pole.kondisi] || KONDISI.baik).warna;
-      L.circleMarker([pole.lat, pole.lng], { radius: 4.5, weight: 1.5, color: '#fff', fillColor: warna, fillOpacity: 1 })
-        .bindPopup(() => popupTiang(pole))
+      const cm = L.circleMarker([pole.lat, pole.lng], { radius: 4.5, weight: 1.5, color: '#fff', fillColor: warna, fillOpacity: 1 })
         .addTo(layerTiang);
+      if (modeKoreksi) cm.on('click', () => pilihKoreksi(pole.uid));
+      else cm.bindPopup(() => popupTiang(pole));
       return;
     }
-    const m = L.marker([pole.lat, pole.lng], { icon: ikonTiang(pole, idx), draggable: true });
+    const m = L.marker([pole.lat, pole.lng], { icon: ikonTiang(pole, idx), draggable: !modeKoreksi });
     m.on('dragend', (e) => {
       const ll = e.target.getLatLng();
       // konfirmasi dulu — mencegah tikor bergeser karena tersenggol saat menggeser peta
@@ -440,7 +531,8 @@ function render() {
       }
       render(); // kembalikan / perbarui posisi marker & garis
     });
-    m.bindPopup(() => popupTiang(pole));
+    if (modeKoreksi) m.on('click', () => pilihKoreksi(pole.uid));
+    else m.bindPopup(() => popupTiang(pole));
     m.addTo(layerTiang);
   });
 
@@ -1345,6 +1437,17 @@ function gabungPoles(masuk) {
   return { baru, diperbarui, total: state.poles.length };
 }
 
+// gabung koreksi sambungan: per pasangan tiang, pemenang = `diubah` terbaru
+function gabungKoreksi(masuk) {
+  const peta = new Map((state.koreksi || []).map(k => [kunciPasangan(k.a, k.b), k]));
+  normalisasiKoreksi(masuk).forEach(k => {
+    const kk = kunciPasangan(k.a, k.b);
+    const ada = peta.get(kk);
+    if (!ada || (k.diubah || 0) > (ada.diubah || 0)) peta.set(kk, k);
+  });
+  state.koreksi = [...peta.values()];
+}
+
 function urlServer() {
   return (state.settings.server || '').trim().replace(/\/+$/, '');
 }
@@ -1357,7 +1460,7 @@ async function kirimKeServer() {
     const res = await fetch(url + '/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': state.settings.kodeUnit },
-      body: JSON.stringify({ poles: state.poles }),
+      body: JSON.stringify({ poles: state.poles, koreksi: state.koreksi }),
     });
     if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
     const d = await res.json();
@@ -1378,6 +1481,7 @@ async function ambilDariServer() {
     if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
     const d = await res.json();
     const hasil = gabungPoles(d.poles);
+    gabungKoreksi(d.koreksi);
     simpan(); render();
     if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
     toast(`✅ Tergabung: ${hasil.baru} titik baru, ${hasil.diperbarui} diperbarui (total ${hasil.total})`);
@@ -1497,7 +1601,7 @@ function eksporKML() {
 }
 
 function eksporJSON() {
-  unduh('CAKRA-Proyek.json', JSON.stringify({ poles: state.poles, settings: state.settings }, null, 2), 'application/json');
+  unduh('CAKRA-Proyek.json', JSON.stringify({ poles: state.poles, koreksi: state.koreksi, settings: state.settings }, null, 2), 'application/json');
   toast('Proyek disimpan sebagai file JSON');
 }
 
@@ -1510,6 +1614,7 @@ function imporJSON(file) {
       const jumlahMentah = d.poles.length;
       const bersih = normalisasiState(d); // saring entri rusak, perbaiki kode tak dikenal
       state.poles = bersih.poles;
+      state.koreksi = bersih.koreksi;
       state.settings = bersih.settings;
       idBerikut = Math.max(0, ...state.poles.map(p => p.id)) + 1;
       simpan(); render();
@@ -1523,8 +1628,9 @@ function imporJSON(file) {
 }
 
 function hapusSemua() {
-  if (!confirm('Hapus SEMUA tiang dan mulai proyek baru?')) return;
+  if (!confirm('Hapus SEMUA tiang & koreksi sambungan, lalu mulai proyek baru?')) return;
   state.poles = [];
+  state.koreksi = [];
   idBerikut = 1;
   simpan(); render();
   tutupModal('modal-ekspor');
@@ -1565,6 +1671,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toast(modeTaging ? 'Ketuk peta untuk menaruh tiang' : 'Mode taging dimatikan');
   };
   $('#btn-rab').onclick = renderRAB;
+  $('#btn-koreksi').onclick = toggleModeKoreksi;
   $('#btn-live').onclick = mulaiLive;
   $('#lv-stop').onclick = stopLive;
   $('#lv-tanam').onclick = bukaTanamCepat;

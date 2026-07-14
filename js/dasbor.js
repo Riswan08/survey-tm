@@ -6,7 +6,10 @@
    ============================================================ */
 
 let poles = [];
+let koreksi = [];     // koreksi sambungan antar tiang (ikut tersinkron)
+let asetStatis = [];  // aset TM bawaan (data/aset-tm.json)
 const KUNCI_CFG = 'cakra_dasbor_cfg';
+const kunciPasangan = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
 
 // ---------------- util ----------------
 const $ = (sel) => document.querySelector(sel);
@@ -81,6 +84,31 @@ function gabung(masuk) {
   return { baru, diperbarui, total: poles.length };
 }
 
+function gabungKoreksi(masuk) {
+  const peta = new Map(koreksi.map(k => [kunciPasangan(k.a, k.b), k]));
+  (Array.isArray(masuk) ? masuk : []).forEach(k => {
+    if (!k || typeof k.a !== 'string' || typeof k.b !== 'string') return;
+    if (k.aksi !== 'tambah' && k.aksi !== 'hapus') return;
+    const ada = peta.get(kunciPasangan(k.a, k.b));
+    if (!ada || (k.diubah || 0) > (ada.diubah || 0)) peta.set(kunciPasangan(k.a, k.b), k);
+  });
+  koreksi = [...peta.values()];
+}
+
+async function muatAsetStatis() {
+  try {
+    const res = await fetch('data/aset-tm.json');
+    if (!res.ok) return;
+    const d = await res.json();
+    asetStatis = (Array.isArray(d.poles) ? d.poles : [])
+      .filter(p => p && typeof p.uid === 'string' && isFinite(p.lat) && isFinite(p.lng));
+    renderPeta();
+    if (asetStatis.length && !poles.length) {
+      peta.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
+    }
+  } catch (e) { /* offline tanpa cache — lewati */ }
+}
+
 // ---------------- peta ----------------
 let peta, layerTitik, sudahFit = false;
 
@@ -113,16 +141,32 @@ function popupHTML(p) {
 
 function renderPeta() {
   layerTitik.clearLayers();
-  // garis jaringan eksisting antar tiang
-  const petaUid = new Map(poles.map(p => [p.uid, p]));
-  const segmen = [];
-  poles.forEach(p => {
-    (p.sambung || []).forEach(uidLain => {
-      const q = petaUid.get(uidLain);
-      if (q) segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
-    });
+  // garis jaringan: aset bawaan + data survey, ditimpa koreksi sambungan
+  const posisi = new Map();
+  asetStatis.forEach(p => posisi.set(p.uid, p));
+  poles.forEach(p => posisi.set(p.uid, p));
+  const tersurvey = new Set(poles.map(p => p.uid));
+  const edges = new Map();
+  const tambahEdge = (a, b) => {
+    if (a !== b && posisi.has(a) && posisi.has(b)) edges.set(kunciPasangan(a, b), [a, b]);
+  };
+  asetStatis.forEach(p => { if (!tersurvey.has(p.uid)) (p.sambung || []).forEach(u => tambahEdge(p.uid, u)); });
+  poles.forEach(p => (p.sambung || []).forEach(u => tambahEdge(p.uid, u)));
+  koreksi.forEach(k => {
+    if (k.aksi === 'hapus') edges.delete(kunciPasangan(k.a, k.b));
+    else tambahEdge(k.a, k.b);
   });
+  const segmen = [];
+  edges.forEach(([a, b]) => segmen.push([[posisi.get(a).lat, posisi.get(a).lng], [posisi.get(b).lat, posisi.get(b).lng]]));
   if (segmen.length) L.polyline(segmen, { color: '#546e7a', weight: 2.5, opacity: .85 }).addTo(layerTitik);
+
+  // marker aset bawaan (abu-abu) — yang tersurvey tampil sebagai marker survey
+  asetStatis.forEach(p => {
+    if (tersurvey.has(p.uid)) return;
+    L.circleMarker([p.lat, p.lng], { radius: 3.5, weight: 1, color: '#fff', fillColor: '#90a4ae', fillOpacity: .9 })
+      .bindPopup(`<b>${p.nama}</b> — Tiang TM (aset)<br>${p.catatan || ''}`)
+      .addTo(layerTitik);
+  });
   poles.forEach(p => {
     const warna = p.mode === 'eksisting'
       ? (KONDISI[p.kondisi] || KONDISI.baik).warna
@@ -241,6 +285,7 @@ async function ambilServer() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
     const hasil = gabung(d.poles);
+    gabungKoreksi(d.koreksi);
     renderSemua();
     toast(`✅ ${hasil.baru} baru, ${hasil.diperbarui} diperbarui — total ${hasil.total} titik`);
   } catch (e) { toast('Gagal: ' + e.message); }
@@ -256,7 +301,7 @@ async function kirimServer() {
     const res = await fetch(url + '/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': unit },
-      body: JSON.stringify({ poles }),
+      body: JSON.stringify({ poles, koreksi }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
@@ -272,6 +317,7 @@ function imporFiles(files) {
       try {
         const d = JSON.parse(r.result);
         const hasil = gabung(Array.isArray(d.poles) ? d.poles : (Array.isArray(d) ? d : []));
+        gabungKoreksi(d.koreksi);
         totalBaru += hasil.baru; totalUbah += hasil.diperbarui;
       } catch (e) { toast(`${file.name}: file tidak valid`); }
       if (++selesai === files.length) {
@@ -285,7 +331,7 @@ function imporFiles(files) {
 
 function unduhGabungan() {
   if (!poles.length) { toast('Belum ada data'); return; }
-  const blob = new Blob([JSON.stringify({ poles }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ poles, koreksi }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'CAKRA-Gabungan.json';
@@ -315,9 +361,10 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#d-unduh').onclick = unduhGabungan;
   $('#d-bersih').onclick = () => {
     if (!poles.length || confirm('Kosongkan data dasbor? (data di server / file tidak terhapus)')) {
-      poles = []; sudahFit = false; renderSemua();
+      poles = []; koreksi = []; sudahFit = false; renderSemua();
     }
   };
 
   renderSemua();
+  muatAsetStatis();
 });

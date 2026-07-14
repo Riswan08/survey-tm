@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=10">
+  <link rel="stylesheet" href="css/style.css?v=11">
 </head>
 <body>
 
@@ -29,6 +29,7 @@
 
   <!-- ===== TOMBOL MELAYANG ===== -->
   <div id="fab-wrap">
+    <button class="fab tag" id="btn-koreksi">🔗 Koreksi Sambungan</button>
     <button class="fab tag" id="btn-tag">🎯 Mode Taging</button>
     <button class="fab gps" id="btn-gps">📍 Ambil Tikor GPS</button>
     <button class="fab live" id="btn-live">🚶 Live Survey</button>
@@ -235,8 +236,8 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=10"></script>
-  <script src="js/app.js?v=10"></script>
+  <script src="js/data.js?v=11"></script>
+  <script src="js/app.js?v=11"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
