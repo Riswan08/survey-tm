@@ -198,7 +198,7 @@ function periksaGawang(p, kecualiId) {
 }
 
 // ---------------- PETA ----------------
-let map, layerTiang, layerGaris, layerGps;
+let map, layerTiang, layerGaris, layerGps, layerAset;
 
 function initPeta() {
   map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([-3.3, 128.95], 13); // sekitar Masohi
@@ -216,7 +216,12 @@ function initPeta() {
     { maxZoom: 19, attribution: 'Esri World Imagery' }
   );
   voyager.addTo(map);
-  L.control.layers({ 'Peta Jalan': voyager, 'OpenStreetMap': osm, 'Satelit': satelit }, null, { position: 'topleft' }).addTo(map);
+  layerAset = L.layerGroup().addTo(map); // aset TM bawaan — selalu tampil, bisa disembunyikan dari kontrol layer
+  L.control.layers(
+    { 'Peta Jalan': voyager, 'OpenStreetMap': osm, 'Satelit': satelit },
+    { 'Jaringan Aset TM (bawaan)': layerAset },
+    { position: 'topleft' }
+  ).addTo(map);
 
   layerGaris = L.layerGroup().addTo(map);
   layerTiang = L.layerGroup().addTo(map);
@@ -228,6 +233,78 @@ function initPeta() {
   map.on('click', (e) => {
     if (modeTaging) bukaFormTiang(null, e.latlng);
   });
+}
+
+// ---------------- LAPISAN ASET TM BAWAAN ----------------
+// data/aset-tm.json = inventaris tiang TM eksisting unit (impor Excel).
+// Selalu tampil di peta (ter-cache offline oleh service worker), read-only,
+// TIDAK membebani localStorage. Ketuk markernya → "Survey Aset Ini" untuk
+// menilai kondisi/temuan (tiang jadi titik survey dengan uid yang sama,
+// sehingga tidak dobel saat sinkronisasi).
+let asetStatis = [];
+
+async function muatAsetStatis() {
+  try {
+    const res = await fetch('data/aset-tm.json');
+    if (!res.ok) return;
+    const d = await res.json();
+    asetStatis = (Array.isArray(d.poles) ? d.poles : [])
+      .filter(p => p && typeof p.uid === 'string' && isFinite(p.lat) && isFinite(p.lng));
+    renderAsetStatis();
+    // pemakaian pertama (belum ada titik survey): fokuskan peta ke wilayah aset
+    if (asetStatis.length && !state.poles.length) {
+      map.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
+    }
+  } catch (e) { /* offline sebelum sempat ter-cache — biarkan, coba lagi saat online */ }
+}
+
+function renderAsetStatis() {
+  if (!layerAset) return;
+  layerAset.clearLayers();
+  if (!asetStatis.length) return;
+
+  // garis kabel antar tiang aset
+  const petaUid = new Map(asetStatis.map(p => [p.uid, p]));
+  const segmen = [];
+  asetStatis.forEach(p => {
+    (p.sambung || []).forEach(u => {
+      const q = petaUid.get(u);
+      if (q) segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
+    });
+  });
+  if (segmen.length) L.polyline(segmen, { color: '#78909c', weight: 2, opacity: .8 }).addTo(layerAset);
+
+  // marker tiang aset — yang sudah dijadikan titik survey tampil dari layer utama saja
+  const uidTersurvey = new Set(state.poles.map(p => p.uid));
+  asetStatis.forEach(p => {
+    if (uidTersurvey.has(p.uid)) return;
+    L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#78909c', fillOpacity: .95 })
+      .bindPopup(() => popupAsetStatis(p))
+      .addTo(layerAset);
+  });
+}
+
+function popupAsetStatis(p) {
+  const div = document.createElement('div');
+  div.className = 'popup-tiang';
+  div.innerHTML = `
+    <div class="pjudul">${p.nama} — Tiang TM (aset unit)</div>
+    <div class="pinfo">${p.catatan || ''}<br>${Number(p.lat).toFixed(6)}, ${Number(p.lng).toFixed(6)}</div>
+    <div class="paksi"><button class="tombol utama kecil">📝 Survey Aset Ini</button></div>`;
+  div.querySelector('button').onclick = () => {
+    map.closePopup();
+    const n = normalisasiPole(p, state.poles.length);
+    if (!n) return;
+    n.id = idBerikut++;
+    n.uid = p.uid; // uid asli dipertahankan → anti-duplikat lintas surveyor
+    n.petugas = state.settings.petugas || '';
+    n.diubah = Date.now();
+    state.poles.push(n);
+    simpan(); render();
+    bukaFormTiang(n.id);
+    toast(`${n.nama} siap disurvey — isi kondisi & temuannya`);
+  };
+  return div;
 }
 
 // ---------------- PETA OFFLINE ----------------
@@ -368,6 +445,7 @@ function render() {
   });
 
   perbaruiRingkasan();
+  renderAsetStatis(); // segarkan lapisan aset (sembunyikan yang sudah jadi titik survey)
 }
 
 function popupTiang(pole) {
@@ -1476,6 +1554,7 @@ document.addEventListener('DOMContentLoaded', () => {
   badgeOffline();
   render();
   if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
+  muatAsetStatis(); // lapisan aset TM bawaan
 
   // tombol
   $('#btn-gps').onclick = ambilTikorGPS;
