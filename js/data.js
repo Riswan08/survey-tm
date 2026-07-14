@@ -299,6 +299,14 @@ const DAMPAK = {
 
 const BOBOT_KONDISI = { baik: 1, rusakRingan: 2, rusakBerat: 3 };
 
+// status tindak lanjut usulan perbaikan (M4)
+const STATUS_USULAN = {
+  diusulkan:  { nama: 'Diusulkan',  warna: '#607d8b' },
+  disetujui:  { nama: 'Disetujui',  warna: '#0288d1' },
+  dikerjakan: { nama: 'Dikerjakan', warna: '#f57c00' },
+  selesai:    { nama: 'Selesai',    warna: '#2e7d32' },
+};
+
 // ------------------------------------------------------------
 // ASET EKSISTING (mode survey kondisi — fondasi usulan perbaikan)
 // ------------------------------------------------------------
@@ -328,6 +336,10 @@ const DEFAULT_SETTINGS = {
   hargaOverride: {},        // { kode: hargaMaterial custom } — dari menu Pengaturan
   jasaOverride: {},         // { kode: hargaJasa custom }
   akurasiMin: 15,           // meter — di atas ini muncul konfirmasi sebelum tikor dipakai
+  // sinkronisasi terpusat (M4) — kosongkan jika bekerja mandiri/offline saja
+  server: '',               // mis. http://192.168.1.10:8787 (server CAKRA internal unit)
+  kodeUnit: '',             // kode unit = kunci akses data bersama
+  petugas: '',              // nama surveyor — tercatat di tiap titik
 };
 
 const DEFAULT_TIANG = 'TIANG_BESI';

@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 
@@ -172,6 +172,23 @@
           <div class="form-grup"><label>Batas Akurasi GPS (m)</label><input type="number" id="s-akurasi" step="1" min="1" max="500"></div>
         </div>
         <label class="cek-baris"><input type="checkbox" id="s-ppn-aktif"> Sertakan PPN dalam total RAB</label>
+
+        <div class="judul-seksi">Sinkronisasi Terpusat (opsional)</div>
+        <div class="form-grup"><label>Nama Petugas / Surveyor</label>
+          <input type="text" id="s-petugas" maxlength="40" placeholder="mis. Riswan — tercatat di tiap titik"></div>
+        <div class="form-baris">
+          <div class="form-grup"><label>Alamat Server CAKRA</label>
+            <input type="text" id="s-server" placeholder="http://192.168.1.10:8787"></div>
+          <div class="form-grup"><label>Kode Unit</label>
+            <input type="text" id="s-unit" placeholder="UP3-MASOHI"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <button class="tombol utama" id="s-kirim" style="flex:1">⬆️ Kirim ke Server</button>
+          <button class="tombol utama" id="s-ambil" style="flex:1">⬇️ Ambil dari Server</button>
+        </div>
+        <p class="catatan-kecil">Server = <code>server/cakra-server.js</code> dijalankan PLN IT di komputer kantor (panduan di repo).
+        Tanpa server pun data antar surveyor tetap bisa digabung lewat Dasbor (impor beberapa file JSON).</p>
+
         <div class="judul-seksi">Harga Satuan (bisa diubah, tersimpan di perangkat)</div>
         <div id="editor-harga"></div>
       </div>
@@ -189,6 +206,9 @@
       <div class="modal-kepala">📤 Ekspor &amp; Proyek
         <button class="tutup" data-tutup="modal-ekspor">×</button></div>
       <div class="modal-isi">
+        <div class="judul-seksi">Dasbor Manajemen</div>
+        <a class="tombol utama" href="dasbor.html" style="display:block;text-align:center;text-decoration:none;margin-bottom:4px">📊 Buka Dasbor (peta kondisi + status usulan)</a>
+        <p class="catatan-kecil" style="margin-bottom:10px">Untuk perencana/manajer: gabungan data semua surveyor, pantau status tindak lanjut usulan.</p>
         <div class="judul-seksi">Ekspor Hasil Survey</div>
         <p class="catatan-kecil" style="margin-bottom:10px">RAB lengkap ke Excel, titik &amp; rute ke Google Earth.</p>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -215,8 +235,8 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=6"></script>
-  <script src="js/app.js?v=6"></script>
+  <script src="js/data.js?v=7"></script>
+  <script src="js/app.js?v=7"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

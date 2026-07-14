@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CAKRA — Dasbor Manajemen Aset</title>
+  <meta name="theme-color" content="#0c6bb5">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css?v=7">
+  <style>
+    /* tata letak khusus dasbor: halaman menggulir, peta di panel */
+    body { overflow: auto; background: var(--abu); }
+    #isi-dasbor { padding: 64px 12px 30px; max-width: 1100px; margin: 0 auto; }
+    .panel { background: #fff; border-radius: var(--radius); box-shadow: 0 1px 6px rgba(0,0,0,.08); padding: 14px 16px; margin-bottom: 14px; }
+    .kartu-baris { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .kartu-stat { background: #f4f8fc; border: 1px solid #dbe6f0; border-radius: 10px; padding: 10px 12px; }
+    .kartu-stat .nilai { font-size: 19px; font-weight: 800; color: var(--biru-tua); }
+    .kartu-stat .ket { font-size: 11px; color: #61707f; }
+    #peta-dasbor { height: 380px; border-radius: 10px; }
+    .baris-alat { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .baris-alat input[type=text] { flex: 1; min-width: 140px; border: 1px solid #c6d0da; border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+    .baris-alat select { border: 1px solid #c6d0da; border-radius: 8px; padding: 8px; font-size: 13px; }
+    table.rab select { border: 1px solid #c6d0da; border-radius: 6px; padding: 4px 6px; font-size: 12px; }
+    .foto-mini { width: 62px; height: 62px; object-fit: cover; border-radius: 6px; margin: 2px; }
+  </style>
+</head>
+<body>
+
+  <header id="topbar">
+    <img class="logo-img" src="icons/icon-192.png" alt="CAKRA">
+    <div class="judul">CAKRA — Dasbor<small>Pantau kondisi aset &amp; status usulan perbaikan</small></div>
+    <div class="spacer"></div>
+    <a class="tombol-bar" href="index.html" style="text-decoration:none">🗺 Aplikasi Survey</a>
+  </header>
+
+  <div id="isi-dasbor">
+
+    <div class="panel">
+      <div class="judul-seksi">Sumber Data</div>
+      <div class="baris-alat" style="margin-bottom:8px">
+        <input type="text" id="d-server" placeholder="Alamat server, mis. http://192.168.1.10:8787">
+        <input type="text" id="d-unit" placeholder="Kode unit" style="max-width:160px">
+        <button class="tombol utama" id="d-ambil">⬇️ Ambil dari Server</button>
+        <button class="tombol utama" id="d-kirim">⬆️ Simpan ke Server</button>
+      </div>
+      <div class="baris-alat">
+        <label class="tombol polos" style="cursor:pointer">📂 Impor File JSON Surveyor (bisa banyak)
+          <input type="file" id="d-file" accept=".json" multiple hidden></label>
+        <button class="tombol polos" id="d-unduh">💾 Unduh JSON Gabungan</button>
+        <button class="tombol bahaya" id="d-bersih">🗑 Kosongkan</button>
+      </div>
+      <p class="catatan-kecil">Tanpa server: kumpulkan file JSON dari tiap surveyor (aplikasi → 📤 → Simpan Proyek), impor semuanya di sini — data tergabung otomatis tanpa duplikat.</p>
+    </div>
+
+    <div class="panel">
+      <div class="judul-seksi">Ringkasan</div>
+      <div class="kartu-baris" id="d-ringkasan"></div>
+    </div>
+
+    <div class="panel">
+      <div class="judul-seksi">Peta Sebaran Aset</div>
+      <div id="peta-dasbor"></div>
+    </div>
+
+    <div class="panel">
+      <div class="judul-seksi">Usulan Perbaikan — Tindak Lanjut</div>
+      <div class="baris-alat" style="margin-bottom:10px">
+        <select id="d-filter-status"><option value="">Semua status</option></select>
+        <select id="d-filter-jenis"><option value="">Semua jenis aset</option></select>
+        <span class="catatan-kecil" id="d-info-filter"></span>
+      </div>
+      <div class="bungkus-tabel" id="d-tabel-usulan"></div>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/data.js?v=7"></script>
+  <script src="js/dasbor.js?v=7"></script>
+</body>
+</html>

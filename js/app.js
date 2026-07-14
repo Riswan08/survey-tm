@@ -5,6 +5,18 @@
 // ---------------- STATE ----------------
 const KUNCI_SIMPAN = 'survey_tm_v1';
 
+// identitas perangkat — untuk uid titik yang unik lintas surveyor (sinkronisasi M4)
+const DEVICE_ID = (() => {
+  let d = localStorage.getItem('cakra_device_id');
+  if (!d) {
+    const b = new Uint8Array(4);
+    crypto.getRandomValues(b);
+    d = [...b].map(x => x.toString(36)).join('').slice(0, 8);
+    localStorage.setItem('cakra_device_id', d);
+  }
+  return d;
+})();
+
 let state = {
   poles: [],                 // {id, nama, lat, lng, tiang, konstruksi, aksesoris:[], catatan}
   settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
@@ -71,9 +83,18 @@ function normalisasiPole(p, indeks) {
     kondisi: KONDISI[p.kondisi] ? p.kondisi : 'baik',
     dampak: DAMPAK[p.dampak] ? p.dampak : 'sedang',
     temuan: Array.isArray(p.temuan) ? p.temuan.filter(t => Object.values(TEMUAN).some(g => g[t])) : [],
-    usulan: Array.isArray(p.usulan) ? p.usulan.filter(u => PAKET_PERBAIKAN[u]) : [],
+    // usulan lama (string kode paket) dimigrasi ke objek {paket, status}
+    usulan: Array.isArray(p.usulan) ? p.usulan.map(u => {
+      if (typeof u === 'string') return PAKET_PERBAIKAN[u] ? { paket: u, status: 'diusulkan' } : null;
+      if (u && PAKET_PERBAIKAN[u.paket]) return { paket: u.paket, status: STATUS_USULAN[u.status] ? u.status : 'diusulkan' };
+      return null;
+    }).filter(Boolean) : [],
     foto: Array.isArray(p.foto) ? p.foto.filter(f => typeof f === 'string' && f.startsWith('data:image')).slice(0, 3) : [],
     catatan: typeof p.catatan === 'string' ? p.catatan.slice(0, 300) : '',
+    // identitas sinkronisasi
+    uid: (typeof p.uid === 'string' && p.uid.length >= 3) ? p.uid.slice(0, 40) : `${DEVICE_ID}-${p.id || indeks + 1}-${indeks}`,
+    petugas: typeof p.petugas === 'string' ? p.petugas.slice(0, 40) : '',
+    diubah: isFinite(p.diubah) ? Number(p.diubah) : 0,
   };
 }
 
@@ -122,6 +143,9 @@ function normalisasiState(d) {
   if (typeof s.ppnAktif === 'boolean') hasil.settings.ppnAktif = s.ppnAktif;
   if (isFinite(s.ppnPersen) && s.ppnPersen >= 0 && s.ppnPersen <= 100) hasil.settings.ppnPersen = Number(s.ppnPersen);
   if (isFinite(s.akurasiMin) && s.akurasiMin >= 1 && s.akurasiMin <= 500) hasil.settings.akurasiMin = Number(s.akurasiMin);
+  if (typeof s.server === 'string') hasil.settings.server = s.server.slice(0, 200);
+  if (typeof s.kodeUnit === 'string') hasil.settings.kodeUnit = s.kodeUnit.slice(0, 60);
+  if (typeof s.petugas === 'string') hasil.settings.petugas = s.petugas.slice(0, 40);
   if (MATERIALS[s.tiangTerakhir] && MATERIALS[s.tiangTerakhir].kategori === 'tiang') hasil.settings.tiangTerakhir = s.tiangTerakhir;
   if (s.hargaOverride && typeof s.hargaOverride === 'object') {
     Object.entries(s.hargaOverride).forEach(([kode, h]) => {
@@ -297,6 +321,7 @@ function render() {
       // konfirmasi dulu — mencegah tikor bergeser karena tersenggol saat menggeser peta
       if (confirm(`Pindahkan ${pole.nama} ke tikor baru?\n${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}`)) {
         pole.lat = ll.lat; pole.lng = ll.lng;
+        pole.diubah = Date.now();
         simpan();
         toast(`${pole.nama} dipindah ke tikor baru`);
       }
@@ -317,7 +342,7 @@ function popupTiang(pole) {
     const j = JENIS_ASET[pole.jenisAset] || { nama: '?' };
     const kd = KONDISI[pole.kondisi] || KONDISI.baik;
     const skor = skorPrioritas(pole);
-    const totalUsulan = (pole.usulan || []).reduce((jml, k) => jml + biayaPaket(k).total, 0);
+    const totalUsulan = (pole.usulan || []).reduce((jml, u) => jml + biayaPaket(u.paket).total, 0);
     isi = `
     <div class="pjudul">${pole.nama} — ${j.nama}</div>
     <div class="pinfo">
@@ -415,13 +440,14 @@ function hitungRAB() {
   // 4) usulan perbaikan aset eksisting — terurut skor prioritas
   const daftarUsulan = [];
   state.poles.filter(p => p.mode === 'eksisting').forEach(p => {
-    (p.usulan || []).forEach(kode => {
-      const pk = PAKET_PERBAIKAN[kode];
+    (p.usulan || []).forEach(u => {
+      const pk = PAKET_PERBAIKAN[u.paket];
       if (!pk) return;
-      const b = biayaPaket(kode);
+      const b = biayaPaket(u.paket);
       daftarUsulan.push({
         aset: p.nama, jenis: (JENIS_ASET[p.jenisAset] || {}).nama || '',
         kondisi: (KONDISI[p.kondisi] || {}).nama || '', paket: pk.nama,
+        status: u.status || 'diusulkan', petugas: p.petugas || '',
         material: b.material, jasa: b.jasa, total: b.total, skor: skorPrioritas(p),
       });
     });
@@ -468,7 +494,7 @@ function renderTemuanUsulan(pole) {
     ? (pole ? pole.temuan || [] : [])
     : [...document.querySelectorAll('#f-temuan input:checked')].map(i => i.value));
   const usulanManual = new Set(pertamaKali
-    ? (pole ? pole.usulan || [] : [])
+    ? (pole ? (pole.usulan || []).map(u => u.paket) : [])
     : [...document.querySelectorAll('#f-usulan input:checked')].map(i => i.value));
   renderTemuanUsulan._siap = true;
 
@@ -655,7 +681,12 @@ function poleDariForm() {
     kondisi: draftKondisi,
     dampak: draftDampak,
     temuan: [...document.querySelectorAll('#f-temuan input:checked')].map(i => i.value),
-    usulan: [...document.querySelectorAll('#f-usulan input:checked')].map(i => i.value),
+    // status usulan yang sudah berjalan dipertahankan; usulan baru = "diusulkan"
+    usulan: [...document.querySelectorAll('#f-usulan input:checked')].map(i => {
+      const lama = editId && (state.poles.find(x => x.id === editId) || {}).usulan;
+      const ada = (lama || []).find(u => u.paket === i.value);
+      return { paket: i.value, status: ada ? ada.status : 'diusulkan' };
+    }),
     foto: [...draftFoto],
     catatan: $('#f-catatan').value.trim(),
   };
@@ -669,10 +700,10 @@ function perbaruiPratinjauBiaya() {
     const kd = KONDISI[p.kondisi] || KONDISI.baik;
     const skor = skorPrioritas(p);
     let totalUsulan = 0, rincianUsulan = [];
-    p.usulan.forEach(kode => {
-      const b = biayaPaket(kode);
+    p.usulan.forEach(u => {
+      const b = biayaPaket(u.paket);
       totalUsulan += b.total;
-      rincianUsulan.push(`${(PAKET_PERBAIKAN[kode] || {}).nama} (${rupiah(b.total)})`);
+      rincianUsulan.push(`${(PAKET_PERBAIKAN[u.paket] || {}).nama} (${rupiah(b.total)})`);
     });
     $('#f-pratinjau').innerHTML =
       `<b>Aset Eksisting — ${j.nama}</b><br>
@@ -695,6 +726,13 @@ function perbaruiPratinjauBiaya() {
      Total titik ini: <b>${rupiah(b.total)}</b>`;
 }
 
+function stempel(p, uidLama) {
+  p.uid = uidLama || `${DEVICE_ID}-${p.id}`;
+  p.petugas = state.settings.petugas || '';
+  p.diubah = Date.now();
+  return p;
+}
+
 function simpanTiangDariForm() {
   const p = poleDariForm();
   if (!isFinite(p.lat) || !isFinite(p.lng) || p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) {
@@ -704,9 +742,11 @@ function simpanTiangDariForm() {
   if (editId) {
     const i = state.poles.findIndex(x => x.id === editId);
     if (i < 0) { toast('Tiang sudah tidak ada — tidak jadi disimpan'); tutupModal('modal-tiang'); return; }
+    stempel(p, state.poles[i].uid);
     state.poles[i] = p;
     toast(`${p.nama} diperbarui`);
   } else {
+    stempel(p);
     state.poles.push(p);
     idBerikut++;
     toast(p.mode === 'eksisting'
@@ -934,6 +974,7 @@ function tanamCepat(kode) {
     catatan: `akurasi GPS ±${Math.round(fix.akurasi)} m`,
   };
   if (!periksaGawang(p, null)) return;
+  stempel(p);
   state.poles.push(p);
   idBerikut++;
   state.settings.tiangTerakhir = p.tiang; // jadi default tanam berikutnya
@@ -993,15 +1034,17 @@ function renderRAB() {
     html += `<p class="catatan-kecil">Belum ada usulan — taging aset eksisting dan centang temuan di lapangan.</p>`;
   } else {
     html += `<div class="bungkus-tabel"><table class="rab">
-      <tr><th>Prioritas</th><th>Aset</th><th>Kondisi</th><th>Paket Perbaikan</th>
+      <tr><th>Prioritas</th><th>Aset</th><th>Kondisi</th><th>Paket Perbaikan</th><th>Status</th>
         <th class="angka">Material</th><th class="angka">Jasa</th><th class="angka">Jumlah</th></tr>`;
     rab.daftarUsulan.forEach(u => {
+      const st = STATUS_USULAN[u.status] || STATUS_USULAN.diusulkan;
       html += `<tr><td><span class="badge-skor" style="background:${warnaSkor(u.skor)}">${u.skor}</span></td>
         <td>${u.aset} — ${u.jenis}</td><td>${u.kondisi}</td><td>${u.paket}</td>
+        <td><span class="badge-skor" style="background:${st.warna}">${st.nama}</span></td>
         <td class="angka">${angka(u.material)}</td><td class="angka">${angka(u.jasa)}</td>
         <td class="angka">${angka(u.total)}</td></tr>`;
     });
-    html += `<tr class="sub"><td colspan="6">Subtotal D — Usulan Perbaikan</td>
+    html += `<tr class="sub"><td colspan="7">Subtotal D — Usulan Perbaikan</td>
       <td class="angka">${angka(rab.totalUsulan)}</td></tr></table></div>`;
   }
 
@@ -1105,6 +1148,9 @@ function renderPengaturan() {
   $('#s-ppn-aktif').checked = s.ppnAktif;
   $('#s-ppn').value = s.ppnPersen;
   $('#s-akurasi').value = s.akurasiMin;
+  $('#s-petugas').value = s.petugas || '';
+  $('#s-server').value = s.server || '';
+  $('#s-unit').value = s.kodeUnit || '';
 
   // editor harga per kategori — material konstruksi punya dua kolom: material & jasa pasang
   const label = { tiang: 'Batang Tiang (harga contoh)', material: 'Material Konstruksi & Pendukung (lampiran UIW MMU)', penghantar: 'Penghantar (harga contoh)', jasa: 'Jasa Gelondongan (harga contoh)' };
@@ -1135,6 +1181,9 @@ function simpanPengaturan() {
   s.ppnAktif = $('#s-ppn-aktif').checked;
   s.ppnPersen = Math.min(100, Math.max(0, parseFloat($('#s-ppn').value) || 11));
   s.akurasiMin = Math.min(500, Math.max(1, parseFloat($('#s-akurasi').value) || 15));
+  s.petugas = $('#s-petugas').value.trim().slice(0, 40);
+  s.server = $('#s-server').value.trim().slice(0, 200);
+  s.kodeUnit = $('#s-unit').value.trim().slice(0, 60);
   document.querySelectorAll('#editor-harga input[data-kode]').forEach(inp => {
     const kode = inp.dataset.kode, nilai = Number(inp.value);
     if (inp.value === '' || !isFinite(nilai) || nilai < 0) return; // kosong / tidak valid → harga lama dipertahankan
@@ -1156,6 +1205,66 @@ function resetHarga() {
   state.settings.hargaOverride = {};
   state.settings.jasaOverride = {};
   simpan(); renderPengaturan(); render();
+}
+
+// ---------------- SINKRONISASI TERPUSAT (M4) ----------------
+// Gabung titik berdasarkan uid (unik lintas perangkat).
+// Jika uid sama: pemenang = yang stempel waktu `diubah` paling baru.
+function gabungPoles(masuk) {
+  const peta = new Map(state.poles.map(p => [p.uid, p]));
+  let baru = 0, diperbarui = 0;
+  (Array.isArray(masuk) ? masuk : []).forEach((m, i) => {
+    const n = normalisasiPole(m, state.poles.length + i);
+    if (!n) return;
+    const ada = peta.get(n.uid);
+    if (!ada) { peta.set(n.uid, n); baru++; }
+    else if ((n.diubah || 0) > (ada.diubah || 0)) { peta.set(n.uid, n); diperbarui++; }
+  });
+  state.poles = [...peta.values()];
+  state.poles.forEach((p, i) => { p.id = i + 1; }); // id lokal dirapikan, uid tetap
+  idBerikut = state.poles.length + 1;
+  return { baru, diperbarui, total: state.poles.length };
+}
+
+function urlServer() {
+  return (state.settings.server || '').trim().replace(/\/+$/, '');
+}
+
+async function kirimKeServer() {
+  const url = urlServer();
+  if (!url || !state.settings.kodeUnit) { toast('Isi alamat server & kode unit dulu'); return; }
+  toast('⬆️ Mengirim data ke server…');
+  try {
+    const res = await fetch(url + '/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': state.settings.kodeUnit },
+      body: JSON.stringify({ poles: state.poles }),
+    });
+    if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
+    const d = await res.json();
+    toast(`✅ Terkirim — server kini menyimpan ${d.total} titik unit ini`);
+  } catch (e) {
+    toast('Gagal kirim: ' + (e.message || 'server tidak terjangkau'));
+  }
+}
+
+async function ambilDariServer() {
+  const url = urlServer();
+  if (!url || !state.settings.kodeUnit) { toast('Isi alamat server & kode unit dulu'); return; }
+  toast('⬇️ Mengambil data dari server…');
+  try {
+    const res = await fetch(url + '/api/data', {
+      headers: { 'X-Kode-Unit': state.settings.kodeUnit },
+    });
+    if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
+    const d = await res.json();
+    const hasil = gabungPoles(d.poles);
+    simpan(); render();
+    if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
+    toast(`✅ Tergabung: ${hasil.baru} titik baru, ${hasil.diperbarui} diperbarui (total ${hasil.total})`);
+  } catch (e) {
+    toast('Gagal ambil: ' + (e.message || 'server tidak terjangkau'));
+  }
 }
 
 // ---------------- EKSPOR / IMPOR ----------------
@@ -1229,10 +1338,11 @@ function eksporCSV() {
   if (rab.daftarUsulan.length) {
     baris('');
     baris('D. USULAN PERBAIKAN ASET EKSISTING (TERURUT PRIORITAS)');
-    baris('Skor', 'Aset', 'Jenis', 'Kondisi', 'Paket Perbaikan', 'Material', 'Jasa', 'Jumlah');
+    baris('Skor', 'Aset', 'Jenis', 'Kondisi', 'Paket Perbaikan', 'Status', 'Petugas', 'Material', 'Jasa', 'Jumlah');
     rab.daftarUsulan.forEach(u => baris(u.skor, u.aset.replace(/;/g, ','), u.jenis, u.kondisi,
-      u.paket.replace(/;/g, ','), Math.round(u.material), Math.round(u.jasa), Math.round(u.total)));
-    baris('TOTAL USULAN PERBAIKAN', '', '', '', '', '', '', Math.round(rab.totalUsulan));
+      u.paket.replace(/;/g, ','), (STATUS_USULAN[u.status] || {}).nama || '', (u.petugas || '').replace(/;/g, ','),
+      Math.round(u.material), Math.round(u.jasa), Math.round(u.total)));
+    baris('TOTAL USULAN PERBAIKAN', '', '', '', '', '', '', '', '', Math.round(rab.totalUsulan));
   }
 
   unduh('CAKRA-RAB-Survey.csv', '﻿' + B.join('\n'), 'text/csv;charset=utf-8');
@@ -1368,6 +1478,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // pengaturan
   $('#s-simpan').onclick = simpanPengaturan;
   $('#s-reset').onclick = resetHarga;
+  const terapkanIsianSync = () => {
+    state.settings.petugas = $('#s-petugas').value.trim().slice(0, 40);
+    state.settings.server = $('#s-server').value.trim().slice(0, 200);
+    state.settings.kodeUnit = $('#s-unit').value.trim().slice(0, 60);
+    simpan();
+  };
+  $('#s-kirim').onclick = () => { terapkanIsianSync(); kirimKeServer(); };
+  $('#s-ambil').onclick = () => { terapkanIsianSync(); ambilDariServer(); };
 
   // ekspor
   $('#e-csv').onclick = eksporCSV;

@@ -213,9 +213,9 @@ prioritas tinggi → menyetujui paket → status terpantau sampai selesai.
 | Milestone | Isi | Status |
 |---|---|---|
 | **M1 — Survey TM & RAB** | Fase 1 lengkap, harga lampiran UIW MMU, PWA offline, live di GitHub Pages | ✅ Selesai (Juli 2026) |
-| **M2 — Rebranding CAKRA** | Nama, logo, ikon aplikasi CAKRA; mode Rencana vs Eksisting | Berikutnya |
-| **M3 — Kondisi & Usulan** | FR-01…FR-07 (aset eksisting, kondisi, foto, paket perbaikan, prioritas) | Direncanakan |
-| **M4 — Data Terpusat** | Backend sinkronisasi, akun, dasbor manajemen | Direncanakan |
+| **M2 — Rebranding CAKRA** | Nama, logo, ikon aplikasi CAKRA; mode Rencana vs Eksisting | ✅ Selesai (Juli 2026) |
+| **M3 — Kondisi & Usulan** | FR-01…FR-07 (aset eksisting, kondisi, foto, paket perbaikan, prioritas) | ✅ Selesai (Juli 2026) |
+| **M4 — Data Terpusat** | Server sinkronisasi (`server/`), dasbor manajemen (`dasbor.html`), status tindak lanjut usulan | ✅ Selesai (Juli 2026) — akun/peran & penugasan menyusul |
 
 ## 14. Di Luar Lingkup (Non-Goals)
 
