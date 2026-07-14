@@ -247,6 +247,22 @@ body {
   background: rgba(0,0,0,.6); color: #fff; font-size: 12px; cursor: pointer;
   line-height: 1;
 }
+/* Slot eviden calon pelanggan */
+.slot-eviden {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid #dde4ea; border-radius: 10px;
+  padding: 7px 9px; margin-bottom: 7px;
+}
+.slot-eviden.terisi { border-color: #a5d6a7; background: #f4faf4; }
+.slot-eviden img, .slot-eviden .kosong {
+  width: 52px; height: 52px; border-radius: 8px; object-fit: cover; flex-shrink: 0;
+}
+.slot-eviden .kosong {
+  background: #eef2f6; display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: #9aa9b8;
+}
+.slot-eviden .lbl { flex: 1; font-size: 12.5px; font-weight: 600; }
+
 .badge-skor {
   display: inline-block; min-width: 26px; text-align: center;
   border-radius: 7px; padding: 2px 6px;

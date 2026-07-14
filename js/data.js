@@ -299,6 +299,26 @@ const DAMPAK = {
 
 const BOBOT_KONDISI = { baik: 1, rusakRingan: 2, rusakBerat: 3 };
 
+// jenis pekerjaan — identitas proyek survey, tampil di RAB & ekspor
+const JENIS_PEKERJAAN = {
+  PERLUASAN_JTM:  'Perluasan Jaringan JTM',
+  PERLUASAN_JTR:  'Perluasan Jaringan JTR',
+  SAMBUNGAN_BARU: 'Penyambungan Baru / Temuan Baru',
+  REHAB:          'Rehab Jaringan',
+  UPRATING_JTM:   'Uprating Jaringan JTM',
+  UPRATING_JTR:   'Uprating Jaringan JTR',
+  PEMELIHARAAN:   'Pemeliharaan Jaringan',
+  LAINNYA:        'Lainnya',
+};
+
+// eviden calon pelanggan — slot foto berlabel
+const EVIDEN_PELANGGAN = {
+  ktp:      'Foto KTP',
+  kk:       'Foto Kartu Keluarga',
+  depan:    'Bangunan Tampak Depan',
+  belakang: 'Bangunan Tampak Belakang',
+};
+
 // status tindak lanjut usulan perbaikan (M4)
 const STATUS_USULAN = {
   diusulkan:  { nama: 'Diusulkan',  warna: '#607d8b' },
@@ -336,6 +356,8 @@ const DEFAULT_SETTINGS = {
   hargaOverride: {},        // { kode: hargaMaterial custom } — dari menu Pengaturan
   jasaOverride: {},         // { kode: hargaJasa custom }
   akurasiMin: 15,           // meter — di atas ini muncul konfirmasi sebelum tikor dipakai
+  jenisPekerjaan: 'PERLUASAN_JTM',  // identitas pekerjaan survey ini
+  namaPekerjaan: '',                // mis. "Perluasan Dusun Waraka"
   // sinkronisasi terpusat (M4) — kosongkan jika bekerja mandiri/offline saja
   server: '',               // mis. http://192.168.1.10:8787 (server CAKRA internal unit)
   kodeUnit: '',             // kode unit = kunci akses data bersama

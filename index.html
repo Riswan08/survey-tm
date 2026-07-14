@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=12">
+  <link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
 
@@ -89,8 +89,9 @@
       <div class="modal-isi">
         <div class="form-grup">
           <div class="seg" id="f-mode">
-            <button type="button" data-mode="rencana" class="aktif">🆕 Rencana Baru</button>
-            <button type="button" data-mode="eksisting">📋 Aset Eksisting</button>
+            <button type="button" data-mode="rencana" class="aktif">🆕 Rencana</button>
+            <button type="button" data-mode="eksisting">📋 Aset</button>
+            <button type="button" data-mode="pelanggan">👤 Calon Pelanggan</button>
           </div>
         </div>
         <div class="form-baris">
@@ -123,6 +124,13 @@
             <label class="tombol polos" style="display:block;text-align:center;cursor:pointer">📷 Ambil / Pilih Foto
               <input type="file" id="f-foto" accept="image/*" capture="environment" hidden></label>
             <div id="galeri-foto"></div>
+          </div>
+        </div>
+        <div id="grup-pelanggan" class="sembunyi">
+          <div class="form-grup"><label>Nama Calon Pelanggan (sesuai KTP)</label>
+            <input type="text" id="f-nama-pelanggan" maxlength="60" placeholder="nama lengkap sesuai KTP"></div>
+          <div class="form-grup"><label>Eviden (foto terkompresi otomatis)</label>
+            <div id="eviden-pelanggan"></div>
           </div>
         </div>
         <div class="form-grup"><label>Catatan (opsional)</label>
@@ -173,6 +181,13 @@
           <div class="form-grup"><label>Batas Akurasi GPS (m)</label><input type="number" id="s-akurasi" step="1" min="1" max="500"></div>
         </div>
         <label class="cek-baris"><input type="checkbox" id="s-ppn-aktif"> Sertakan PPN dalam total RAB</label>
+
+        <div class="judul-seksi">Identitas Pekerjaan</div>
+        <div class="form-baris">
+          <div class="form-grup"><label>Jenis Pekerjaan</label><select id="s-jenis-pekerjaan"></select></div>
+          <div class="form-grup"><label>Nama Pekerjaan / Lokasi</label>
+            <input type="text" id="s-nama-pekerjaan" maxlength="80" placeholder="mis. Perluasan Dusun Waraka"></div>
+        </div>
 
         <div class="judul-seksi">Sinkronisasi Terpusat (opsional)</div>
         <div class="form-grup"><label>Nama Petugas / Surveyor</label>
@@ -236,8 +251,8 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=12"></script>
-  <script src="js/app.js?v=12"></script>
+  <script src="js/data.js?v=13"></script>
+  <script src="js/app.js?v=13"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

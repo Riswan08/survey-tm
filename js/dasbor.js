@@ -50,7 +50,9 @@ function rapikan(p, i) {
     uid: (typeof p.uid === 'string' && p.uid.length >= 3) ? p.uid.slice(0, 40) : `impor-${i}-${lat.toFixed(5)}-${lng.toFixed(5)}`,
     nama: (typeof p.nama === 'string' && p.nama.trim()) ? p.nama.trim().slice(0, 40) : `#${i + 1}`,
     lat, lng,
-    mode: p.mode === 'eksisting' ? 'eksisting' : 'rencana',
+    mode: (p.mode === 'eksisting' || p.mode === 'pelanggan') ? p.mode : 'rencana',
+    namaPelanggan: typeof p.namaPelanggan === 'string' ? p.namaPelanggan.slice(0, 60) : '',
+    fotoPelanggan: (p.fotoPelanggan && typeof p.fotoPelanggan === 'object') ? p.fotoPelanggan : {},
     konstruksi: KONSTRUKSI[p.konstruksi] ? p.konstruksi : 'TM-1',
     jenisAset: JENIS_ASET[p.jenisAset] ? p.jenisAset : 'TIANG_TM',
     kondisi: KONDISI[p.kondisi] ? p.kondisi : 'baik',
@@ -125,7 +127,9 @@ function initPeta() {
 
 function popupHTML(p) {
   const eksisting = p.mode === 'eksisting';
-  const judul = eksisting ? (JENIS_ASET[p.jenisAset] || {}).nama : `${p.konstruksi} (rencana)`;
+  const judul = p.mode === 'pelanggan'
+    ? `Calon Pelanggan: ${p.namaPelanggan || '-'}`
+    : eksisting ? (JENIS_ASET[p.jenisAset] || {}).nama : `${p.konstruksi} (rencana)`;
   const kd = KONDISI[p.kondisi] || KONDISI.baik;
   const totalUsulan = p.usulan.reduce((jml, u) => jml + biayaPaket(u.paket).total, 0);
   return `<div class="popup-tiang">
@@ -168,9 +172,11 @@ function renderPeta() {
       .addTo(layerTitik);
   });
   poles.forEach(p => {
-    const warna = p.mode === 'eksisting'
-      ? (KONDISI[p.kondisi] || KONDISI.baik).warna
-      : (KONSTRUKSI[p.konstruksi] || {}).warna || '#0c6bb5';
+    const warna = p.mode === 'pelanggan'
+      ? '#7b1fa2'
+      : p.mode === 'eksisting'
+        ? (KONDISI[p.kondisi] || KONDISI.baik).warna
+        : (KONSTRUKSI[p.konstruksi] || {}).warna || '#0c6bb5';
     L.circleMarker([p.lat, p.lng], {
       radius: 7, weight: 2, color: '#fff', fillColor: warna, fillOpacity: 1,
     }).bindPopup(popupHTML(p)).addTo(layerTitik);
@@ -199,9 +205,11 @@ function renderRingkasan() {
   const rusak = eksisting.filter(p => p.kondisi !== 'baik');
   const usulan = semuaUsulan();
   const totalNilai = usulan.reduce((jml, u) => jml + u.total, 0);
+  const pelanggan = poles.filter(p => p.mode === 'pelanggan');
   let html = `
     <div class="kartu-stat"><div class="nilai">${poles.length}</div><div class="ket">Total titik (semua surveyor)</div></div>
     <div class="kartu-stat"><div class="nilai">${eksisting.length}</div><div class="ket">Aset eksisting tersurvey</div></div>
+    <div class="kartu-stat"><div class="nilai" style="color:#7b1fa2">${pelanggan.length}</div><div class="ket">Calon pelanggan</div></div>
     <div class="kartu-stat"><div class="nilai" style="color:#e53935">${rusak.length}</div><div class="ket">Aset kondisi rusak</div></div>
     <div class="kartu-stat"><div class="nilai">${usulan.length}</div><div class="ket">Usulan perbaikan</div></div>
     <div class="kartu-stat"><div class="nilai">${rupiah(totalNilai)}</div><div class="ket">Total nilai usulan</div></div>`;
