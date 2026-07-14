@@ -158,12 +158,12 @@ function renderPeta() {
   });
   const segmen = [];
   edges.forEach(([a, b]) => segmen.push([[posisi.get(a).lat, posisi.get(a).lng], [posisi.get(b).lat, posisi.get(b).lng]]));
-  if (segmen.length) L.polyline(segmen, { color: '#546e7a', weight: 2.5, opacity: .85 }).addTo(layerTitik);
+  if (segmen.length) L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85 }).addTo(layerTitik); // kabel: hijau
 
   // marker aset bawaan (abu-abu) — yang tersurvey tampil sebagai marker survey
   asetStatis.forEach(p => {
     if (tersurvey.has(p.uid)) return;
-    L.circleMarker([p.lat, p.lng], { radius: 3.5, weight: 1, color: '#fff', fillColor: '#90a4ae', fillOpacity: .9 })
+    L.circleMarker([p.lat, p.lng], { radius: 3.5, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .9 })
       .bindPopup(`<b>${p.nama}</b> — Tiang TM (aset)<br>${p.catatan || ''}`)
       .addTo(layerTitik);
   });

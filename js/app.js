@@ -284,8 +284,8 @@ function renderAsetStatis() {
   const uidTersurvey = new Set(state.poles.map(p => p.uid));
   asetStatis.forEach(p => {
     if (uidTersurvey.has(p.uid)) return;
-    const cm = L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#78909c', fillOpacity: .95 })
-      .addTo(layerAset);
+    const cm = L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .95 })
+      .addTo(layerAset); // tiang aset: hijau
     if (modeKoreksi) cm.on('click', () => pilihKoreksi(p.uid));
     else cm.bindPopup(() => popupAsetStatis(p));
   });
@@ -503,7 +503,7 @@ function render() {
     segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
   });
   if (segmen.length) {
-    L.polyline(segmen, { color: '#546e7a', weight: 2.5, opacity: .85 }).addTo(layerGaris);
+    L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85 }).addTo(layerGaris); // kabel jaringan: hijau
   }
 
   // marker tiang — jika aset eksisting sangat banyak (impor massal), pakai titik
