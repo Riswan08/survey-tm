@@ -100,6 +100,8 @@ const MATERIALS = {
   // --- Jasa gelondongan (CONTOH — sesuaikan) ---
   JASA_TIANG:    { nama: 'Jasa Tanam / Pancang Tiang',             satuan: 'tiang', harga: 1500000,  jasa: 0, kategori: 'jasa' },
   JASA_TARIK:    { nama: 'Jasa Penarikan Penghantar (per km rute)', satuan: 'km',   harga: 12000000, jasa: 0, kategori: 'jasa' },
+  JASA_RABAS:    { nama: 'Jasa Rabas / Pangkas Pohon per titik (CONTOH)', satuan: 'titik', harga: 0, jasa: 350000, kategori: 'jasa' },
+  JASA_TARIK_ULANG: { nama: 'Jasa Tarik Ulang Andongan per seksi (CONTOH)', satuan: 'seksi', harga: 0, jasa: 750000, kategori: 'jasa' },
 };
 
 // ------------------------------------------------------------
@@ -228,6 +230,74 @@ const AKSESORIS = {
     bom: { LBS630: 1, SKOEN70: 6 },
   },
 };
+
+// ------------------------------------------------------------
+// PAKET PERBAIKAN (M3) — usulan per temuan, BOM memakai harga
+// lampiran UIW MMU. Paket berbasis jasa contoh ditandai (CONTOH).
+// tanamTiang: true → biaya jasa tanam tiang ikut dihitung.
+// ------------------------------------------------------------
+const PAKET_PERBAIKAN = {
+  GANTI_TIANG: {
+    nama: 'Ganti tiang + konstruksi penumpu (TM-1)', tanamTiang: true,
+    bom: { TIANG_BESI: 1, UNP10_2000: 1, ADAPTOR: 1, SIKU_672: 2, BEUGEL_5: 1, KLEM_SIKU_5: 1, MUR50: 2, MUR75: 4, MUR180: 2, BENDING: 3 },
+  },
+  PASANG_TOPANG_TARIK: { nama: 'Pasang topang tarik JTM',            bom: { TOPANG_TARIK_SET: 1 } },
+  PASANG_KONTRA_MAS:   { nama: 'Pasang topang antar tarik (kontra mas)', bom: { KLEM_TREK_5: 3, SLING35: 30, BETON_SCHOOR: 1, ISOL_TELUR: 1, TURNBUCKLE: 2, WIRECLIP35: 12, ANGKER: 1, KAUSEN35: 2, MUR_M15_50: 6 } },
+  PASANG_TOPANG_TEKAN: { nama: 'Pasang topang tekan JTM',            bom: { STRUT: 1, BEUGEL_5: 1, PIPA2_15M: 1, COR_BETON: 1, KLEM_TREK_5B: 2, KLEM_TREK_7: 2, MUR75B: 12 } },
+  PASANG_GROUNDING_ARR:{ nama: 'Pasang/ganti grounding arrester',    bom: { EARTH_ROD: 1, CU50: 14, SCHOEN_CU50: 1, PIPA34: 1, STAINLESS: 3, STOPBUCKLE: 3 } },
+  GANTI_DUDUKAN_FCO:   { nama: 'Ganti dudukan FCO & arrester',       bom: { UNP10_2400: 1, BEUGEL_5: 1, MUR75B: 2 } },
+  PASANG_RAMBU:        { nama: 'Pasang rambu pengaman + penghalang panjat', bom: { PENGHALANG: 1, RAMBU: 1 } },
+  PASANG_LBS:          { nama: 'Pasang LBS Manual 630 A',            bom: { LBS630: 1, SKOEN70: 6 } },
+  PERBAIKI_JUMPER:     { nama: 'Perbaikan kawat rantas / jumper (joint sleeve)', bom: { JOINT70: 3, BENDING: 3 } },
+  TARIK_ULANG:         { nama: 'Tarik ulang / perbaiki andongan (CONTOH)', bom: { JASA_TARIK_ULANG: 1 } },
+  RABAS:               { nama: 'Rabas / pangkas pohon (CONTOH)',     bom: { JASA_RABAS: 1 } },
+};
+
+// ------------------------------------------------------------
+// TEMUAN LAPANGAN per jenis aset → paket perbaikan yang disarankan
+// ------------------------------------------------------------
+const TEMUAN = {
+  TIANG_TM: {
+    T_KEROPOS:  { nama: 'Tiang keropos / korosi berat',        paket: 'GANTI_TIANG' },
+    T_RETAK:    { nama: 'Tiang retak / pecah',                 paket: 'GANTI_TIANG' },
+    T_MIRING:   { nama: 'Tiang miring',                        paket: 'PASANG_TOPANG_TARIK' },
+    T_TARIKAN:  { nama: 'Tarikan berat tanpa topang',          paket: 'PASANG_KONTRA_MAS' },
+    T_RAMBU:    { nama: 'Tanpa rambu / penghalang panjat',     paket: 'PASANG_RAMBU' },
+  },
+  GARDU: {
+    G_GROUNDING:{ nama: 'Grounding arrester rusak / hilang',   paket: 'PASANG_GROUNDING_ARR' },
+    G_FCO:      { nama: 'Dudukan FCO keropos / rusak',         paket: 'GANTI_DUDUKAN_FCO' },
+    G_RAMBU:    { nama: 'Rambu pengaman tidak ada',            paket: 'PASANG_RAMBU' },
+    G_LBS:      { nama: 'Perlu LBS untuk manuver',             paket: 'PASANG_LBS' },
+  },
+  PENGHANTAR: {
+    P_RANTAS:   { nama: 'Kawat rantas / burik',                paket: 'PERBAIKI_JUMPER' },
+    P_JUMPER:   { nama: 'Jumper kendor / titik panas',         paket: 'PERBAIKI_JUMPER' },
+    P_KENDOR:   { nama: 'Andongan kendor / terlalu rendah',    paket: 'TARIK_ULANG' },
+  },
+  PENGAMAN: {
+    PA_ARRESTER:{ nama: 'Arrester rusak / hilang',             paket: 'PASANG_GROUNDING_ARR' },
+    PA_FCO:     { nama: 'FCO rusak / dudukan keropos',         paket: 'GANTI_DUDUKAN_FCO' },
+  },
+  GROUNDING: {
+    GR_PUTUS:   { nama: 'Kawat grounding putus / hilang',      paket: 'PASANG_GROUNDING_ARR' },
+  },
+  ROW: {
+    R_SENTUH:   { nama: 'Pohon menyentuh jaringan',            paket: 'RABAS' },
+    R_DEKAT:    { nama: 'Pohon mendekati ruang bebas',         paket: 'RABAS' },
+  },
+};
+
+// ------------------------------------------------------------
+// DAMPAK GANGGUAN — bobot prioritas (skor = kondisi × dampak)
+// ------------------------------------------------------------
+const DAMPAK = {
+  rendah: { nama: 'Rendah (ujung cabang)',    bobot: 1 },
+  sedang: { nama: 'Sedang (cabang / desa)',   bobot: 2 },
+  tinggi: { nama: 'Tinggi (penyulang utama)', bobot: 3 },
+};
+
+const BOBOT_KONDISI = { baik: 1, rusakRingan: 2, rusakBerat: 3 };
 
 // ------------------------------------------------------------
 // ASET EKSISTING (mode survey kondisi — fondasi usulan perbaikan)

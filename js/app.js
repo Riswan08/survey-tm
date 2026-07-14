@@ -47,7 +47,11 @@ function toast(pesan) {
 }
 
 function simpan() {
-  localStorage.setItem(KUNCI_SIMPAN, JSON.stringify({ poles: state.poles, settings: state.settings, idBerikut }));
+  try {
+    localStorage.setItem(KUNCI_SIMPAN, JSON.stringify({ poles: state.poles, settings: state.settings, idBerikut }));
+  } catch (e) {
+    toast('⚠️ Penyimpanan HP hampir penuh — hapus sebagian foto atau ekspor proyek ke JSON');
+  }
 }
 
 // --- validasi data: apa pun isi localStorage / file impor, state selalu sehat ---
@@ -65,8 +69,34 @@ function normalisasiPole(p, indeks) {
     aksesoris: Array.isArray(p.aksesoris) ? p.aksesoris.filter(a => AKSESORIS[a]) : [],
     jenisAset: JENIS_ASET[p.jenisAset] ? p.jenisAset : 'TIANG_TM',
     kondisi: KONDISI[p.kondisi] ? p.kondisi : 'baik',
+    dampak: DAMPAK[p.dampak] ? p.dampak : 'sedang',
+    temuan: Array.isArray(p.temuan) ? p.temuan.filter(t => Object.values(TEMUAN).some(g => g[t])) : [],
+    usulan: Array.isArray(p.usulan) ? p.usulan.filter(u => PAKET_PERBAIKAN[u]) : [],
+    foto: Array.isArray(p.foto) ? p.foto.filter(f => typeof f === 'string' && f.startsWith('data:image')).slice(0, 3) : [],
     catatan: typeof p.catatan === 'string' ? p.catatan.slice(0, 300) : '',
   };
+}
+
+// ---------------- USULAN PERBAIKAN (M3) ----------------
+function biayaPaket(kode) {
+  const pk = PAKET_PERBAIKAN[kode];
+  if (!pk) return { material: 0, jasa: 0, total: 0 };
+  let material = 0, jasa = 0;
+  Object.entries(pk.bom).forEach(([k, q]) => {
+    material += hargaEfektif(k) * q;
+    jasa += jasaEfektif(k) * q;
+  });
+  if (pk.tanamTiang) jasa += hargaEfektif('JASA_TIANG');
+  return { material, jasa, total: material + jasa };
+}
+
+// skor prioritas 1–9: tingkat kerusakan × dampak gangguan
+function skorPrioritas(pole) {
+  return (BOBOT_KONDISI[pole.kondisi] || 1) * ((DAMPAK[pole.dampak] || DAMPAK.sedang).bobot);
+}
+
+function warnaSkor(skor) {
+  return skor >= 6 ? '#e53935' : skor >= 3 ? '#f57c00' : '#2e7d32';
 }
 
 // titik rencana = rantai jaringan yang dihitung RAB & jaraknya; aset eksisting terpisah
@@ -286,10 +316,15 @@ function popupTiang(pole) {
   if (pole.mode === 'eksisting') {
     const j = JENIS_ASET[pole.jenisAset] || { nama: '?' };
     const kd = KONDISI[pole.kondisi] || KONDISI.baik;
+    const skor = skorPrioritas(pole);
+    const totalUsulan = (pole.usulan || []).reduce((jml, k) => jml + biayaPaket(k).total, 0);
     isi = `
     <div class="pjudul">${pole.nama} — ${j.nama}</div>
     <div class="pinfo">
-      Kondisi: <b style="color:${kd.warna}">${kd.nama}</b><br>
+      Kondisi: <b style="color:${kd.warna}">${kd.nama}</b> ·
+      Prioritas: <span class="badge-skor" style="background:${warnaSkor(skor)}">${skor}</span><br>
+      ${(pole.usulan || []).length ? `Usulan: ${pole.usulan.length} paket — <b>${rupiah(totalUsulan)}</b><br>` : ''}
+      ${(pole.foto || []).length ? `📷 ${pole.foto.length} foto<br>` : ''}
       ${pole.lat.toFixed(6)}, ${pole.lng.toFixed(6)}
       ${pole.catatan ? '<br>' + pole.catatan : ''}
     </div>`;
@@ -377,13 +412,31 @@ function hitungRAB() {
   const jasaTiang = rencana.length * hargaEfektif('JASA_TIANG');
   const jasaTarik = (rute / 1000) * hargaEfektif('JASA_TARIK');
 
-  const subtotal = totalMaterialTiang + totalJasaKonstruksi + biayaPenghantar + jasaTiang + jasaTarik;
+  // 4) usulan perbaikan aset eksisting — terurut skor prioritas
+  const daftarUsulan = [];
+  state.poles.filter(p => p.mode === 'eksisting').forEach(p => {
+    (p.usulan || []).forEach(kode => {
+      const pk = PAKET_PERBAIKAN[kode];
+      if (!pk) return;
+      const b = biayaPaket(kode);
+      daftarUsulan.push({
+        aset: p.nama, jenis: (JENIS_ASET[p.jenisAset] || {}).nama || '',
+        kondisi: (KONDISI[p.kondisi] || {}).nama || '', paket: pk.nama,
+        material: b.material, jasa: b.jasa, total: b.total, skor: skorPrioritas(p),
+      });
+    });
+  });
+  daftarUsulan.sort((a, b) => b.skor - a.skor || b.total - a.total);
+  const totalUsulan = daftarUsulan.reduce((jml, u) => jml + u.total, 0);
+
+  const subtotal = totalMaterialTiang + totalJasaKonstruksi + biayaPenghantar + jasaTiang + jasaTarik + totalUsulan;
   const ppn = s.ppnAktif ? subtotal * (s.ppnPersen / 100) : 0;
 
   return {
     barisRekap, totalMaterialTiang, totalJasaKonstruksi,
     rute, ph, panjangKawat, biayaPenghantar,
     jasaTiang, jasaTarik,
+    daftarUsulan, totalUsulan,
     subtotal, ppn, grandTotal: subtotal + ppn,
   };
 }
@@ -399,6 +452,88 @@ function perbaruiRingkasan() {
 // ---------------- FORM TITIK (TAMBAH / EDIT) ----------------
 let draftModeTitik = 'rencana';
 let draftKondisi = 'baik';
+let draftDampak = 'sedang';
+let draftFoto = [];
+
+// temuan yang dicentang menyarankan paket perbaikannya (baris hijau);
+// user tetap bebas menambah/menghapus usulan
+function renderTemuanUsulan(pole) {
+  const jenis = $('#f-jenis-aset').value || 'TIANG_TM';
+  const grupTemuan = TEMUAN[jenis] || {};
+  // form baru dibuka → mulai dari data tersimpan (kosong jika titik baru),
+  // JANGAN baca sisa centang form sebelumnya di DOM.
+  // render ulang dalam sesi form yang sama (ganti jenis aset) → pertahankan centang user.
+  const pertamaKali = !renderTemuanUsulan._siap;
+  const temuanAktif = new Set(pertamaKali
+    ? (pole ? pole.temuan || [] : [])
+    : [...document.querySelectorAll('#f-temuan input:checked')].map(i => i.value));
+  const usulanManual = new Set(pertamaKali
+    ? (pole ? pole.usulan || [] : [])
+    : [...document.querySelectorAll('#f-usulan input:checked')].map(i => i.value));
+  renderTemuanUsulan._siap = true;
+
+  const wt = $('#f-temuan');
+  wt.innerHTML = '';
+  Object.entries(grupTemuan).forEach(([kode, t]) => {
+    const lbl = document.createElement('label');
+    lbl.className = 'cek-baris';
+    lbl.innerHTML = `<input type="checkbox" value="${kode}" ${temuanAktif.has(kode) ? 'checked' : ''}> ${t.nama}`;
+    lbl.querySelector('input').onchange = (e) => {
+      // temuan dicentang → paketnya ikut tercentang otomatis
+      if (e.target.checked && t.paket) {
+        const cb = document.querySelector(`#f-usulan input[value="${t.paket}"]`);
+        if (cb) { cb.checked = true; cb.closest('.baris-usulan').classList.add('saran'); }
+      }
+      perbaruiPratinjauBiaya();
+    };
+    wt.appendChild(lbl);
+  });
+  if (!Object.keys(grupTemuan).length) wt.innerHTML = '<p class="catatan-kecil">Tidak ada daftar temuan untuk jenis aset ini.</p>';
+
+  const paketSaran = new Set(Object.entries(grupTemuan).filter(([k]) => temuanAktif.has(k)).map(([, t]) => t.paket));
+  const wu = $('#f-usulan');
+  wu.innerHTML = '';
+  Object.entries(PAKET_PERBAIKAN).forEach(([kode, pk]) => {
+    const dicentang = usulanManual.has(kode) || paketSaran.has(kode);
+    const b = biayaPaket(kode);
+    const lbl = document.createElement('label');
+    lbl.className = 'baris-usulan' + (paketSaran.has(kode) ? ' saran' : '');
+    lbl.innerHTML = `<input type="checkbox" value="${kode}" ${dicentang ? 'checked' : ''}> ${pk.nama}
+      <span class="hrg">± ${rupiah(b.total)}</span>`;
+    lbl.querySelector('input').onchange = perbaruiPratinjauBiaya;
+    wu.appendChild(lbl);
+  });
+}
+
+// --- foto: kompres ke maks 900 px JPEG agar hemat penyimpanan HP ---
+function tambahFoto(file) {
+  if (draftFoto.length >= 3) { toast('Maksimal 3 foto per aset'); return; }
+  const img = new Image();
+  img.onload = () => {
+    const skala = Math.min(1, 900 / Math.max(img.width, img.height));
+    const kanvas = document.createElement('canvas');
+    kanvas.width = Math.round(img.width * skala);
+    kanvas.height = Math.round(img.height * skala);
+    kanvas.getContext('2d').drawImage(img, 0, 0, kanvas.width, kanvas.height);
+    draftFoto.push(kanvas.toDataURL('image/jpeg', 0.6));
+    URL.revokeObjectURL(img.src);
+    renderGaleri();
+  };
+  img.onerror = () => toast('File bukan gambar yang valid');
+  img.src = URL.createObjectURL(file);
+}
+
+function renderGaleri() {
+  const g = $('#galeri-foto');
+  g.innerHTML = '';
+  draftFoto.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'foto';
+    div.innerHTML = `<img src="${f}" alt="foto ${i + 1}"><button type="button" title="Hapus foto">✕</button>`;
+    div.querySelector('button').onclick = () => { draftFoto.splice(i, 1); renderGaleri(); };
+    g.appendChild(div);
+  });
+}
 
 function terapkanModeForm() {
   const eksisting = draftModeTitik === 'eksisting';
@@ -422,6 +557,9 @@ function bukaFormTiang(id, latlng) {
   draftKonstruksi = pole ? pole.konstruksi : draftKonstruksi;
   draftModeTitik = pole ? (pole.mode === 'eksisting' ? 'eksisting' : 'rencana') : draftModeTitik;
   draftKondisi = pole ? (pole.kondisi || 'baik') : 'baik';
+  draftDampak = pole ? (pole.dampak || 'sedang') : 'sedang';
+  draftFoto = pole ? [...(pole.foto || [])] : [];
+  renderTemuanUsulan._siap = false;
 
   $('#f-judul').textContent = pole ? `Edit ${pole.nama}` : 'Taging Titik Baru';
   $('#f-nama').value = pole ? pole.nama : namaBerikut(draftModeTitik === 'eksisting' ? 'A' : 'T');
@@ -479,6 +617,24 @@ function bukaFormTiang(id, latlng) {
     wk.appendChild(b);
   });
 
+  // dampak gangguan (prioritas)
+  const wd = $('#f-dampak');
+  wd.innerHTML = '';
+  Object.entries(DAMPAK).forEach(([kode, d]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = d.nama;
+    b.className = kode === draftDampak ? 'aktif' : '';
+    b.onclick = () => {
+      draftDampak = kode;
+      [...wd.children].forEach(el => el.classList.toggle('aktif', el === b));
+      perbaruiPratinjauBiaya();
+    };
+    wd.appendChild(b);
+  });
+
+  renderTemuanUsulan(pole);
+  renderGaleri();
   terapkanModeForm();
   bukaModal('modal-tiang');
 }
@@ -497,6 +653,10 @@ function poleDariForm() {
     aksesoris: [...document.querySelectorAll('#pilih-aksesoris input:checked')].map(i => i.value),
     jenisAset: $('#f-jenis-aset').value || 'TIANG_TM',
     kondisi: draftKondisi,
+    dampak: draftDampak,
+    temuan: [...document.querySelectorAll('#f-temuan input:checked')].map(i => i.value),
+    usulan: [...document.querySelectorAll('#f-usulan input:checked')].map(i => i.value),
+    foto: [...draftFoto],
     catatan: $('#f-catatan').value.trim(),
   };
 }
@@ -507,10 +667,21 @@ function perbaruiPratinjauBiaya() {
   if (p.mode === 'eksisting') {
     const j = JENIS_ASET[p.jenisAset] || { nama: '?' };
     const kd = KONDISI[p.kondisi] || KONDISI.baik;
+    const skor = skorPrioritas(p);
+    let totalUsulan = 0, rincianUsulan = [];
+    p.usulan.forEach(kode => {
+      const b = biayaPaket(kode);
+      totalUsulan += b.total;
+      rincianUsulan.push(`${(PAKET_PERBAIKAN[kode] || {}).nama} (${rupiah(b.total)})`);
+    });
     $('#f-pratinjau').innerHTML =
       `<b>Aset Eksisting — ${j.nama}</b><br>
-       Kondisi: <b style="color:${kd.warna}">${kd.nama}</b><br>
-       <span style="font-size:11px">Tidak masuk RAB. Di fase M3, kondisi rusak otomatis membawa usulan perbaikan + RAB.</span>`;
+       Kondisi: <b style="color:${kd.warna}">${kd.nama}</b> ·
+       Skor prioritas: <span class="badge-skor" style="background:${warnaSkor(skor)}">${skor}</span><br>` +
+      (p.usulan.length
+        ? `<span style="font-size:11px">${rincianUsulan.join(', ')}</span><br>
+           Total usulan perbaikan aset ini: <b>${rupiah(totalUsulan)}</b>`
+        : `<span style="font-size:11px">Belum ada usulan perbaikan — centang temuan di lapangan untuk saran otomatis.</span>`);
     return;
   }
   const b = biayaPerTiang(p);
@@ -817,9 +988,26 @@ function renderRAB() {
         <td class="angka">${rupiah(hargaEfektif('JASA_TARIK'))}</td><td class="angka">${rupiah(rab.jasaTarik)}</td></tr>
     </table></div>`;
 
-  html += `<div class="judul-seksi">D. Total</div>
+  html += `<div class="judul-seksi">D. Usulan Perbaikan Aset Eksisting (terurut prioritas)</div>`;
+  if (rab.daftarUsulan.length === 0) {
+    html += `<p class="catatan-kecil">Belum ada usulan — taging aset eksisting dan centang temuan di lapangan.</p>`;
+  } else {
+    html += `<div class="bungkus-tabel"><table class="rab">
+      <tr><th>Prioritas</th><th>Aset</th><th>Kondisi</th><th>Paket Perbaikan</th>
+        <th class="angka">Material</th><th class="angka">Jasa</th><th class="angka">Jumlah</th></tr>`;
+    rab.daftarUsulan.forEach(u => {
+      html += `<tr><td><span class="badge-skor" style="background:${warnaSkor(u.skor)}">${u.skor}</span></td>
+        <td>${u.aset} — ${u.jenis}</td><td>${u.kondisi}</td><td>${u.paket}</td>
+        <td class="angka">${angka(u.material)}</td><td class="angka">${angka(u.jasa)}</td>
+        <td class="angka">${angka(u.total)}</td></tr>`;
+    });
+    html += `<tr class="sub"><td colspan="6">Subtotal D — Usulan Perbaikan</td>
+      <td class="angka">${angka(rab.totalUsulan)}</td></tr></table></div>`;
+  }
+
+  html += `<div class="judul-seksi">E. Total</div>
     <div class="bungkus-tabel"><table class="rab">
-      <tr class="sub"><td>Subtotal (A + B + C)</td><td class="angka">${rupiah(rab.subtotal)}</td></tr>
+      <tr class="sub"><td>Subtotal (A + B + C + D)</td><td class="angka">${rupiah(rab.subtotal)}</td></tr>
       <tr><td>PPN ${s.ppnAktif ? s.ppnPersen + '%' : '(nonaktif)'}</td><td class="angka">${rupiah(rab.ppn)}</td></tr>
       <tr class="total"><td>GRAND TOTAL RAB</td><td class="angka">${rupiah(rab.grandTotal)}</td></tr>
     </table></div>
@@ -844,13 +1032,13 @@ function renderRAB() {
     html += `</table></div>`;
   }
 
-  // catatan aset eksisting
+  // ringkasan aset eksisting
   const eksisting = state.poles.filter(p => p.mode === 'eksisting');
   if (eksisting.length) {
     const rusak = eksisting.filter(p => p.kondisi !== 'baik').length;
     html += `<div class="judul-seksi">Aset Eksisting Tersurvey</div>
-      <p class="catatan-kecil">${eksisting.length} aset tersurvey, <b>${rusak} dalam kondisi rusak</b> —
-      lihat detail di menu 📋 Titik. Usulan perbaikan otomatis + RAB-nya hadir di fase M3.</p>`;
+      <p class="catatan-kecil">${eksisting.length} aset tersurvey, <b>${rusak} dalam kondisi rusak</b>,
+      ${rab.daftarUsulan.length} usulan perbaikan senilai <b>${rupiah(rab.totalUsulan)}</b> (lihat bagian D).</p>`;
   }
 
   $('#isi-rab').innerHTML = html;
@@ -1025,13 +1213,26 @@ function eksporCSV() {
   if (eksistingCSV.length) {
     baris('');
     baris('DAFTAR ASET EKSISTING TERSURVEY');
-    baris('Nama', 'Jenis Aset', 'Kondisi', 'Latitude', 'Longitude', 'Catatan');
+    baris('Nama', 'Jenis Aset', 'Kondisi', 'Dampak', 'Skor Prioritas', 'Latitude', 'Longitude', 'Temuan', 'Jml Foto', 'Catatan');
     eksistingCSV.forEach(p => baris(
       p.nama.replace(/;/g, ','),
       (JENIS_ASET[p.jenisAset] || {}).nama || p.jenisAset,
       (KONDISI[p.kondisi] || {}).nama || p.kondisi,
+      (DAMPAK[p.dampak] || {}).nama || '',
+      skorPrioritas(p),
       p.lat, p.lng,
+      (p.temuan || []).map(t => { const g = TEMUAN[p.jenisAset] || {}; return (g[t] || {}).nama || t; }).join(' + ').replace(/;/g, ','),
+      (p.foto || []).length,
       (p.catatan || '').replace(/;/g, ',')));
+  }
+
+  if (rab.daftarUsulan.length) {
+    baris('');
+    baris('D. USULAN PERBAIKAN ASET EKSISTING (TERURUT PRIORITAS)');
+    baris('Skor', 'Aset', 'Jenis', 'Kondisi', 'Paket Perbaikan', 'Material', 'Jasa', 'Jumlah');
+    rab.daftarUsulan.forEach(u => baris(u.skor, u.aset.replace(/;/g, ','), u.jenis, u.kondisi,
+      u.paket.replace(/;/g, ','), Math.round(u.material), Math.round(u.jasa), Math.round(u.total)));
+    baris('TOTAL USULAN PERBAIKAN', '', '', '', '', '', '', Math.round(rab.totalUsulan));
   }
 
   unduh('CAKRA-RAB-Survey.csv', '﻿' + B.join('\n'), 'text/csv;charset=utf-8');
@@ -1155,7 +1356,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // form titik
   $('#f-simpan').onclick = simpanTiangDariForm;
   $('#f-tiang').onchange = perbaruiPratinjauBiaya;
-  $('#f-jenis-aset').onchange = perbaruiPratinjauBiaya;
+  $('#f-jenis-aset').onchange = () => { renderTemuanUsulan(null); perbaruiPratinjauBiaya(); };
+  $('#f-foto').onchange = (e) => {
+    [...e.target.files].forEach(tambahFoto);
+    e.target.value = '';
+  };
   document.querySelectorAll('#f-mode button').forEach(b => {
     b.onclick = () => { draftModeTitik = b.dataset.mode; terapkanModeForm(); };
   });
