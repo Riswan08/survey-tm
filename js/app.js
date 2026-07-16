@@ -286,20 +286,33 @@ async function muatAsetStatis() {
   } catch (e) { /* offline sebelum sempat ter-cache — biarkan, coba lagi saat online */ }
 }
 
+// marker aset dibangun SEKALI (28 rb titik ≈ 1 dtk), lalu tiap render
+// hanya disinkronkan: sembunyikan yang tersurvey & sesuaikan mode koreksi.
+let cacheMarkerAset = new Map(); // uid -> { cm, p }
+
 function renderAsetStatis() {
   if (!layerAset) return;
-  layerAset.clearLayers();
-  if (!asetStatis.length) return;
+  if (!asetStatis.length) { layerAset.clearLayers(); cacheMarkerAset.clear(); return; }
 
-  // marker tiang aset — garis kabel digambar terpadu di render() (termasuk koreksi);
-  // yang sudah dijadikan titik survey tampil dari layer utama saja
+  if (!cacheMarkerAset.size) {
+    layerAset.clearLayers();
+    asetStatis.forEach(p => {
+      const cm = L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .95 });
+      cm.on('click', () => { if (modeKoreksi) { cm.closePopup(); pilihKoreksi(p.uid); } });
+      cm.addTo(layerAset);
+      cacheMarkerAset.set(p.uid, { cm, p });
+    });
+  }
+
   const uidTersurvey = new Set(state.poles.map(p => p.uid));
-  asetStatis.forEach(p => {
-    if (uidTersurvey.has(p.uid)) return;
-    const cm = L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .95 })
-      .addTo(layerAset); // tiang aset: hijau
-    if (modeKoreksi) cm.on('click', () => pilihKoreksi(p.uid));
-    else cm.bindPopup(() => popupAsetStatis(p));
+  cacheMarkerAset.forEach(({ cm, p }, uid) => {
+    const sembunyikan = uidTersurvey.has(uid);
+    const tampil = layerAset.hasLayer(cm);
+    if (sembunyikan && tampil) layerAset.removeLayer(cm);
+    else if (!sembunyikan && !tampil) layerAset.addLayer(cm);
+    // popup nonaktif saat mode koreksi agar ketukan langsung memilih tiang
+    if (modeKoreksi && cm.getPopup()) cm.unbindPopup();
+    else if (!modeKoreksi && !cm.getPopup()) cm.bindPopup(() => popupAsetStatis(p));
   });
 }
 
