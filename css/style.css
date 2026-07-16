@@ -65,7 +65,20 @@ body {
 .label-tiang .pin {
   display: flex; flex-direction: column; align-items: center;
   transform: translateY(-4px);
+  position: relative;
 }
+/* lencana status pekerjaan pada marker */
+.badge-u {
+  position: absolute; top: -9px; left: calc(50% + 4px);
+  width: 15px; height: 15px; border-radius: 50%;
+  font-size: 10px; font-weight: 900; color: #fff;
+  text-align: center; line-height: 15px;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.45);
+  z-index: 5;
+}
+.badge-u.perlu { background: #e53935; }
+.badge-u.ok { background: #2e7d32; }
 .label-tiang .titik {
   width: 16px; height: 16px; border-radius: 50%;
   border: 3px solid #fff;

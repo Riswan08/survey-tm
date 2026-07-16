@@ -132,19 +132,37 @@ function popupHTML(p) {
     : eksisting ? (JENIS_ASET[p.jenisAset] || {}).nama : `${p.konstruksi} (rencana)`;
   const kd = KONDISI[p.kondisi] || KONDISI.baik;
   const totalUsulan = p.usulan.reduce((jml, u) => jml + biayaPaket(u.paket).total, 0);
+  const daftarPekerjaan = p.usulan.map(u => {
+    const st = STATUS_USULAN[u.status] || STATUS_USULAN.diusulkan;
+    return `• ${(PAKET_PERBAIKAN[u.paket] || {}).nama || u.paket}
+      <span class="badge-skor" style="background:${st.warna};font-size:10px">${st.nama}</span>`;
+  }).join('<br>');
   return `<div class="popup-tiang">
     <div class="pjudul">${p.nama} — ${judul}</div>
     <div class="pinfo">
       ${eksisting ? `Kondisi: <b style="color:${kd.warna}">${kd.nama}</b> · Prioritas ${skorPrioritas(p)}<br>` : ''}
-      ${p.usulan.length ? `Usulan: ${p.usulan.map(u => (PAKET_PERBAIKAN[u.paket] || {}).nama).join(', ')} — <b>${rupiah(totalUsulan)}</b><br>` : ''}
+      ${daftarPekerjaan ? `<b>Pekerjaan (${p.usulan.length}) — ${rupiah(totalUsulan)}:</b><br>${daftarPekerjaan}<br>` : ''}
       ${p.petugas ? `Petugas: ${p.petugas}<br>` : ''}
       ${p.catatan ? p.catatan + '<br>' : ''}
       ${p.foto.map(f => `<img class="foto-mini" src="${f}">`).join('')}
     </div></div>`;
 }
 
+// fokus peta ke sebuah titik + buka popupnya (dipanggil dari daftar usulan)
+function fokusTitik(uid) {
+  const p = poles.find(x => x.uid === uid);
+  if (!p) return;
+  peta.setView([p.lat, p.lng], 18);
+  const m = markerPerUid.get(uid);
+  if (m) m.openPopup();
+  document.querySelector('#peta-dasbor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+let markerPerUid = new Map(); // untuk fokus + buka popup dari daftar usulan
+
 function renderPeta() {
   layerTitik.clearLayers();
+  markerPerUid = new Map();
   // garis jaringan: aset bawaan + data survey, ditimpa koreksi sambungan
   const posisi = new Map();
   asetStatis.forEach(p => posisi.set(p.uid, p));
@@ -177,9 +195,24 @@ function renderPeta() {
       : p.mode === 'eksisting'
         ? (KONDISI[p.kondisi] || KONDISI.baik).warna
         : (KONSTRUKSI[p.konstruksi] || {}).warna || '#0c6bb5';
-    L.circleMarker([p.lat, p.lng], {
-      radius: 7, weight: 2, color: '#fff', fillColor: warna, fillOpacity: 1,
-    }).bindPopup(popupHTML(p)).addTo(layerTitik);
+    let m;
+    if (p.mode === 'eksisting' && (p.usulan || []).length) {
+      // titik ber-usulan: marker berlencana ❗ (belum rampung) / ✔ (semua selesai)
+      const selesai = p.usulan.every(u => u.status === 'selesai');
+      m = L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          className: 'label-tiang',
+          html: `<div class="pin"><div class="badge-u ${selesai ? 'ok' : 'perlu'}">${selesai ? '✔' : '!'}</div>
+            <div class="titik" style="background:${warna};border-radius:3px"></div>
+            <div class="nama">${p.nama}</div></div>`,
+          iconSize: [0, 0],
+        }),
+      });
+    } else {
+      m = L.circleMarker([p.lat, p.lng], { radius: 7, weight: 2, color: '#fff', fillColor: warna, fillOpacity: 1 });
+    }
+    m.bindPopup(popupHTML(p)).addTo(layerTitik);
+    markerPerUid.set(p.uid, m);
   });
   if (poles.length && !sudahFit) {
     peta.fitBounds(poles.map(p => [p.lat, p.lng]), { padding: [30, 30] });
@@ -263,9 +296,57 @@ function renderTabelUsulan() {
       if (!entri) return;
       entri.status = sel.value;
       p.diubah = Date.now(); // agar perubahan status menang saat sinkron
-      renderRingkasan(); renderTabelUsulan();
+      renderPeta(); renderRingkasan(); renderTitikUsulan(); renderTabelUsulan(); // lencana ❗/✔ ikut segar
       toast(`${p.nama}: ${(PAKET_PERBAIKAN[entri.paket] || {}).nama} → ${STATUS_USULAN[sel.value].nama}`);
     };
+  });
+}
+
+// ---------------- daftar titik dengan usulan pekerjaan ----------------
+// Ketuk titik → rincian jenis pekerjaannya terbuka; ketuk pekerjaan → peta
+// langsung mengarah ke lokasinya.
+function renderTitikUsulan() {
+  const wadah = $('#d-titik-usulan');
+  const daftar = poles
+    .filter(p => p.mode === 'eksisting' && (p.usulan || []).length)
+    .sort((a, b) => skorPrioritas(b) - skorPrioritas(a));
+  if (!daftar.length) {
+    wadah.innerHTML = '<p class="catatan-kecil">Belum ada titik dengan usulan pekerjaan.</p>';
+    return;
+  }
+  wadah.innerHTML = '';
+  daftar.forEach(p => {
+    const selesai = p.usulan.every(u => u.status === 'selesai');
+    const total = p.usulan.reduce((jml, u) => jml + biayaPaket(u.paket).total, 0);
+    const baris = document.createElement('div');
+    baris.className = 'item-tiang';
+    baris.style.cursor = 'pointer';
+    baris.innerHTML = `
+      <div class="bulat" style="background:${selesai ? '#2e7d32' : '#e53935'}">${selesai ? '✔' : '!'}</div>
+      <div class="isi">
+        <div class="nm">${p.nama} — ${(JENIS_ASET[p.jenisAset] || {}).nama || ''}</div>
+        <div class="dt">${p.usulan.length} pekerjaan · ${rupiah(total)} · prioritas ${skorPrioritas(p)}
+          ${p.petugas ? ' · ' + p.petugas : ''}</div>
+      </div>
+      <div class="aksi">▾</div>`;
+    const rincian = document.createElement('div');
+    rincian.className = 'sembunyi';
+    rincian.style.cssText = 'margin:-4px 0 10px 40px';
+    p.usulan.forEach(u => {
+      const st = STATUS_USULAN[u.status] || STATUS_USULAN.diusulkan;
+      const b = biayaPaket(u.paket);
+      const item = document.createElement('div');
+      item.className = 'hasil-cari';
+      item.innerHTML = `<span class="ik">🔧</span>
+        <div><div>${(PAKET_PERBAIKAN[u.paket] || {}).nama || u.paket}
+          <span class="badge-skor" style="background:${st.warna};font-size:10px">${st.nama}</span></div>
+        <div class="ket-hasil">${rupiah(b.total)} — ketuk untuk menuju lokasi</div></div>`;
+      item.onclick = (e) => { e.stopPropagation(); fokusTitik(p.uid); };
+      rincian.appendChild(item);
+    });
+    baris.onclick = () => rincian.classList.toggle('sembunyi');
+    wadah.appendChild(baris);
+    wadah.appendChild(rincian);
   });
 }
 
@@ -385,6 +466,7 @@ async function jalankanPencarian() {
 function renderSemua() {
   renderPeta();
   renderRingkasan();
+  renderTitikUsulan();
   renderTabelUsulan();
   renderTabelPelanggan();
 }

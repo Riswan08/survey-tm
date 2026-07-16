@@ -511,6 +511,14 @@ async function unduhTileArea() {
   toast(gagal ? `Peta tersimpan sebagian: ${sukses} tile OK, ${gagal} gagal` : `✅ Peta offline siap — ${sukses} tile tersimpan`);
 }
 
+// lencana status pekerjaan di marker: ❗ ada usulan belum rampung, ✔ semua selesai
+function badgeUsulan(pole) {
+  const u = pole.usulan || [];
+  if (!u.length) return '';
+  const selesai = u.every(x => x.status === 'selesai');
+  return `<div class="badge-u ${selesai ? 'ok' : 'perlu'}" title="${selesai ? 'Pekerjaan selesai' : 'Ada usulan pekerjaan'}">${selesai ? '✔' : '!'}</div>`;
+}
+
 function ikonTiang(pole, idx) {
   if (pole.mode === 'pelanggan') {
     return L.divIcon({
@@ -524,7 +532,7 @@ function ikonTiang(pole, idx) {
     const j = JENIS_ASET[pole.jenisAset] || { nama: '?' };
     return L.divIcon({
       className: 'label-tiang',
-      html: `<div class="pin"><div class="titik" style="background:${k.warna};border-radius:3px"></div><div class="nama">${pole.nama} · ${j.nama}</div></div>`,
+      html: `<div class="pin">${badgeUsulan(pole)}<div class="titik" style="background:${k.warna};border-radius:3px"></div><div class="nama">${pole.nama} · ${j.nama}</div></div>`,
       iconSize: [0, 0],
     });
   }
@@ -581,7 +589,8 @@ function render() {
   const jumlahEksisting = state.poles.filter(p => p.mode === 'eksisting').length;
   const modeRingan = jumlahEksisting > 300;
   state.poles.forEach((pole, idx) => {
-    if (modeRingan && pole.mode === 'eksisting') {
+    // titik dengan usulan pekerjaan selalu pakai marker berlencana (❗/✔)
+    if (modeRingan && pole.mode === 'eksisting' && !(pole.usulan || []).length) {
       const warna = (KONDISI[pole.kondisi] || KONDISI.baik).warna;
       const cm = L.circleMarker([pole.lat, pole.lng], { radius: 4.5, weight: 1.5, color: '#fff', fillColor: warna, fillOpacity: 1 })
         .addTo(layerTiang);
@@ -629,12 +638,17 @@ function popupTiang(pole) {
     const kd = KONDISI[pole.kondisi] || KONDISI.baik;
     const skor = skorPrioritas(pole);
     const totalUsulan = (pole.usulan || []).reduce((jml, u) => jml + biayaPaket(u.paket).total, 0);
+    const daftarPekerjaan = (pole.usulan || []).map(u => {
+      const st = STATUS_USULAN[u.status] || STATUS_USULAN.diusulkan;
+      return `• ${(PAKET_PERBAIKAN[u.paket] || {}).nama || u.paket}
+        <span class="badge-skor" style="background:${st.warna};font-size:10px">${st.nama}</span>`;
+    }).join('<br>');
     isi = `
     <div class="pjudul">${pole.nama} — ${j.nama}</div>
     <div class="pinfo">
       Kondisi: <b style="color:${kd.warna}">${kd.nama}</b> ·
       Prioritas: <span class="badge-skor" style="background:${warnaSkor(skor)}">${skor}</span><br>
-      ${(pole.usulan || []).length ? `Usulan: ${pole.usulan.length} paket — <b>${rupiah(totalUsulan)}</b><br>` : ''}
+      ${daftarPekerjaan ? `<b>Pekerjaan (${pole.usulan.length}) — ${rupiah(totalUsulan)}:</b><br>${daftarPekerjaan}<br>` : ''}
       ${(pole.foto || []).length ? `📷 ${pole.foto.length} foto<br>` : ''}
       ${pole.lat.toFixed(6)}, ${pole.lng.toFixed(6)}
       ${pole.catatan ? '<br>' + pole.catatan : ''}
