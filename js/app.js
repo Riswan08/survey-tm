@@ -905,10 +905,19 @@ function bukaFormTiang(id, latlng) {
   $('#f-tiang').value = pole ? pole.tiang : DEFAULT_TIANG;
   $('#f-catatan').value = pole ? (pole.catatan || '') : '';
 
-  // kartu konstruksi
+  // kartu konstruksi — dikelompokkan JTM / JTR
   const wadah = $('#pilih-konstruksi');
   wadah.innerHTML = '';
+  let grupTerakhir = null;
   Object.entries(KONSTRUKSI).forEach(([kode, k]) => {
+    const grup = k.grup || 'JTM';
+    if (grup !== grupTerakhir) {
+      const h = document.createElement('div');
+      h.className = 'grup-kartu';
+      h.textContent = grup === 'JTR' ? '💡 JTR — Tegangan Rendah (harga contoh)' : '⚡ JTM — Tegangan Menengah (harga lampiran)';
+      wadah.appendChild(h);
+      grupTerakhir = grup;
+    }
     const kartu = document.createElement('div');
     kartu.className = 'kartu-k' + (kode === draftKonstruksi ? ' pilih' : '');
     kartu.dataset.kode = kode;
@@ -1273,7 +1282,16 @@ function renderKartuCepat() {
   const aksesoris = [...document.querySelectorAll('#q-aksesoris input:checked')].map(i => i.value);
   const wadah = $('#q-konstruksi');
   wadah.innerHTML = '';
+  let grupCepat = null;
   Object.entries(KONSTRUKSI).forEach(([kode, k]) => {
+    const grup = k.grup || 'JTM';
+    if (grup !== grupCepat) {
+      const h = document.createElement('div');
+      h.className = 'grup-kartu';
+      h.textContent = grup === 'JTR' ? '💡 JTR — Tegangan Rendah' : '⚡ JTM — Tegangan Menengah';
+      wadah.appendChild(h);
+      grupCepat = grup;
+    }
     const b = biayaPerTiang({ tiang, konstruksi: kode, aksesoris });
     const kartu = document.createElement('div');
     kartu.className = 'kartu-q';

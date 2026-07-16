@@ -303,6 +303,12 @@ body {
 .kartu-k .kode { font-weight: 800; font-size: 13px; }
 .kartu-k .fungsi { font-size: 11px; color: #45566a; margin-top: 2px; }
 .kartu-k .sudut { font-size: 10px; color: #7c8b9a; margin-top: 2px; }
+.grup-kartu {
+  grid-column: 1 / -1;
+  font-size: 11px; font-weight: 800; color: var(--biru-tua);
+  border-bottom: 2px solid var(--kuning);
+  padding: 6px 0 3px; margin-top: 2px;
+}
 
 .info-biaya {
   background: #eef7ee; border: 1px solid #bfdcbf;

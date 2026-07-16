@@ -91,11 +91,23 @@ const MATERIALS = {
   LBS630:        { nama: 'LBS Manual 630 A + Pelengkap',           satuan: 'set', harga: 29420528, jasa: 1578020, kategori: 'material' },
   SKOEN70:       { nama: 'Skoen Cable AL/CU 70',                   satuan: 'set', harga: 80735,  jasa: 20220, kategori: 'material' },
 
+  // --- Tiang & material konstruksi JTR / Tegangan Rendah ---
+  // (HARGA CONTOH — lampiran harga JTR belum tersedia; sesuaikan di Pengaturan)
+  TIANG_9_200:   { nama: 'Tiang Beton 9 m / 200 daN (TR)',        satuan: 'btg', harga: 2800000, jasa: 0, kategori: 'tiang' },
+  TIANG_9_350:   { nama: 'Tiang Beton 9 m / 350 daN (TR)',        satuan: 'btg', harga: 3400000, jasa: 0, kategori: 'tiang' },
+  SUSP_SET:      { nama: 'Suspension Clamp + Bracket JTR (set)',  satuan: 'set', harga: 165000, jasa: 35000, kategori: 'material' },
+  STRAIN_SET:    { nama: 'Strain Clamp / Fixed Dead End + Bracket JTR (set)', satuan: 'set', harga: 195000, jasa: 40000, kategori: 'material' },
+  SS_STRIP:      { nama: 'Stainless Steel Strip + Stopping Buckle (set)', satuan: 'set', harga: 45000, jasa: 15000, kategori: 'material' },
+  CCO_TR:        { nama: 'Konektor Tap (CCO) JTR',                satuan: 'bh',  harga: 45000,  jasa: 20000, kategori: 'material' },
+  PS_STRAP:      { nama: 'Plastic Strap JTR',                     satuan: 'bh',  harga: 8000,   jasa: 3000,  kategori: 'material' },
+
   // --- Penghantar utama (HARGA CONTOH — tidak ada di lampiran) ---
   PH_AAAC70:     { nama: 'Penghantar AAAC 70 mm²',                 satuan: 'm', harga: 28000,  jasa: 0, kategori: 'penghantar', fasa: 3 },
   PH_AAAC150:    { nama: 'Penghantar AAAC 150 mm²',                satuan: 'm', harga: 52000,  jasa: 0, kategori: 'penghantar', fasa: 3 },
   PH_AAAC240:    { nama: 'Penghantar AAAC 240 mm²',                satuan: 'm', harga: 78000,  jasa: 0, kategori: 'penghantar', fasa: 3 },
   PH_MVTIC150:   { nama: 'Kabel MVTIC 3×150 mm² (twisted)',        satuan: 'm', harga: 185000, jasa: 0, kategori: 'penghantar', fasa: 1 },
+  PH_LVTC70:     { nama: 'Kabel Pilin JTR LVTC/NFA2X 3×70+50 mm²', satuan: 'm', harga: 65000,  jasa: 0, kategori: 'penghantar', fasa: 1 },
+  PH_LVTC50:     { nama: 'Kabel Pilin JTR LVTC/NFA2X 3×50+35 mm²', satuan: 'm', harga: 52000,  jasa: 0, kategori: 'penghantar', fasa: 1 },
 
   // --- Jasa gelondongan (CONTOH — sesuaikan) ---
   JASA_TIANG:    { nama: 'Jasa Tanam / Pancang Tiang',             satuan: 'tiang', harga: 1500000,  jasa: 0, kategori: 'jasa' },
@@ -179,6 +191,29 @@ const KONSTRUKSI = {
     desc: 'Konstruksi tiang end pole dua arm.',
     bom: { UNP10_3000: 4, STEELPLATE: 12, MUR180: 24, MUR300: 8 },
   },
+
+  // ---- KONSTRUKSI JTR / TEGANGAN RENDAH (kabel pilin LVTC/NFA2X) ----
+  // Standar konstruksi JTR PLN; HARGA CONTOH — sesuaikan bila lampiran JTR tersedia.
+  'TR-1': {
+    nama: 'Tiang Penumpu JTR', sudut: 'jalur lurus', warna: '#7cb342', grup: 'JTR',
+    desc: 'Penumpu kabel pilin: suspension clamp + bracket.',
+    bom: { SUSP_SET: 1, SS_STRIP: 2, PS_STRAP: 3 },
+  },
+  'TR-2': {
+    nama: 'Tiang Sudut JTR', sudut: 'sudut kecil', warna: '#26a69a', grup: 'JTR',
+    desc: 'Sudut kecil: suspension clamp ganda.',
+    bom: { SUSP_SET: 2, SS_STRIP: 3, PS_STRAP: 3 },
+  },
+  'TR-3': {
+    nama: 'Tiang Awal / Akhir JTR', sudut: 'awal / akhir', warna: '#ef5350', grup: 'JTR',
+    desc: 'Awal/akhir jaringan: strain clamp (fixed dead end).',
+    bom: { STRAIN_SET: 1, SS_STRIP: 2, PS_STRAP: 2 },
+  },
+  'TR-4': {
+    nama: 'Tiang Penegang / Sudut Besar JTR', sudut: 'penegang / seksi', warna: '#ab47b2', grup: 'JTR',
+    desc: 'Penegang atau sudut besar: strain clamp ganda + konektor jumper.',
+    bom: { STRAIN_SET: 2, SS_STRIP: 4, CCO_TR: 4, PS_STRAP: 3 },
+  },
 };
 
 // ------------------------------------------------------------
@@ -250,6 +285,9 @@ const PAKET_PERBAIKAN = {
   PASANG_LBS:          { nama: 'Pasang LBS Manual 630 A',            bom: { LBS630: 1, SKOEN70: 6 } },
   PERBAIKI_JUMPER:     { nama: 'Perbaikan kawat rantas / jumper (joint sleeve)', bom: { JOINT70: 3, BENDING: 3 } },
   TARIK_ULANG:         { nama: 'Tarik ulang / perbaiki andongan (CONTOH)', bom: { JASA_TARIK_ULANG: 1 } },
+  GANTI_TIANG_TR:      { nama: 'Ganti tiang TR + konstruksi penumpu TR-1 (CONTOH)', tanamTiang: true,
+                         bom: { TIANG_9_200: 1, SUSP_SET: 1, SS_STRIP: 2, PS_STRAP: 3 } },
+  GANTI_KLEM_TR:       { nama: 'Ganti suspension/strain clamp JTR (CONTOH)', bom: { SUSP_SET: 1, STRAIN_SET: 1, SS_STRIP: 2 } },
   RABAS:               { nama: 'Rabas / pangkas pohon (CONTOH)',     bom: { JASA_RABAS: 1 } },
 };
 
@@ -263,6 +301,13 @@ const TEMUAN = {
     T_MIRING:   { nama: 'Tiang miring',                        paket: 'PASANG_TOPANG_TARIK' },
     T_TARIKAN:  { nama: 'Tarikan berat tanpa topang',          paket: 'PASANG_KONTRA_MAS' },
     T_RAMBU:    { nama: 'Tanpa rambu / penghalang panjat',     paket: 'PASANG_RAMBU' },
+  },
+  TIANG_TR: {
+    TR_KEROPOS: { nama: 'Tiang keropos / korosi berat',        paket: 'GANTI_TIANG_TR' },
+    TR_RETAK:   { nama: 'Tiang retak / pecah',                 paket: 'GANTI_TIANG_TR' },
+    TR_MIRING:  { nama: 'Tiang miring',                        paket: 'PASANG_TOPANG_TARIK' },
+    TR_KLEM:    { nama: 'Suspension/strain clamp rusak',       paket: 'GANTI_KLEM_TR' },
+    TR_KENDOR:  { nama: 'Kabel pilin kendor / terlalu rendah', paket: 'TARIK_ULANG' },
   },
   GARDU: {
     G_GROUNDING:{ nama: 'Grounding arrester rusak / hilang',   paket: 'PASANG_GROUNDING_ARR' },
@@ -332,6 +377,7 @@ const STATUS_USULAN = {
 // ------------------------------------------------------------
 const JENIS_ASET = {
   TIANG_TM:   { nama: 'Tiang TM',                 ikon: '🗼' },
+  TIANG_TR:   { nama: 'Tiang TR (Tegangan Rendah)', ikon: '🕯️' },
   GARDU:      { nama: 'Gardu Distribusi',         ikon: '🏠' },
   PENGHANTAR: { nama: 'Penghantar / Seksi Jaringan', ikon: '➿' },
   PENGAMAN:   { nama: 'Pengaman (Arrester / FCO)', ikon: '🛡️' },
