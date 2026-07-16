@@ -247,6 +247,29 @@ body {
   background: rgba(0,0,0,.6); color: #fff; font-size: 12px; cursor: pointer;
   line-height: 1;
 }
+/* Panel pencarian lokasi */
+#panel-cari {
+  position: fixed; top: 52px; left: 0; right: 0; z-index: 1150;
+  background: #fff;
+  border-bottom: 1px solid #dfe5ea;
+  box-shadow: 0 3px 10px rgba(0,0,0,.12);
+  padding: 8px 10px;
+}
+#panel-cari .cari-baris { display: flex; gap: 7px; }
+#panel-cari input {
+  flex: 1; border: 1px solid #c6d0da; border-radius: 9px;
+  padding: 9px 11px; font-size: 14px;
+}
+#cari-hasil { max-height: 45vh; overflow-y: auto; }
+.hasil-cari {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 6px; border-bottom: 1px solid #eef2f6;
+  cursor: pointer; font-size: 13px;
+}
+.hasil-cari:active { background: #eaf4fd; }
+.hasil-cari .ik { font-size: 16px; flex-shrink: 0; }
+.hasil-cari .ket-hasil { font-size: 11px; color: #7c8b9a; }
+
 /* Slot eviden calon pelanggan */
 .slot-eviden {
   display: flex; align-items: center; gap: 10px;

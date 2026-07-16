@@ -1805,6 +1805,94 @@ function hapusSemua() {
   toast('Proyek baru dimulai');
 }
 
+// ---------------- PENCARIAN LOKASI ----------------
+// Tiga sumber sekaligus: (1) tikor langsung "-3.33, 128.95",
+// (2) titik di data sendiri (nama titik / nama pelanggan / aset / catatan),
+// (3) nama desa/tempat via geocoding OpenStreetMap (butuh internet).
+let markerCari = null;
+
+function parseTikor(q) {
+  const m = q.trim().match(/^(-?\d{1,3}(?:[.,]\d+)?)[\s,;]+(-?\d{1,3}(?:[.,]\d+)?)$/);
+  if (!m) return null;
+  const lat = parseFloat(m[1].replace(',', '.'));
+  const lng = parseFloat(m[2].replace(',', '.'));
+  if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
+}
+
+function menujuHasil(lat, lng, label) {
+  if (markerCari) map.removeLayer(markerCari);
+  markerCari = L.circleMarker([lat, lng], { radius: 11, color: '#d81b60', weight: 4, fill: false })
+    .bindPopup(`<b>${label}</b><br>${lat.toFixed(6)}, ${lng.toFixed(6)}`)
+    .addTo(map);
+  map.setView([lat, lng], Math.max(map.getZoom(), 16));
+  markerCari.openPopup();
+  $('#cari-hasil').innerHTML = '';
+}
+
+function itemHasil(ikon, judul, ket, lat, lng) {
+  const div = document.createElement('div');
+  div.className = 'hasil-cari';
+  div.innerHTML = `<span class="ik">${ikon}</span><div><div>${judul}</div><div class="ket-hasil">${ket}</div></div>`;
+  div.onclick = () => menujuHasil(lat, lng, judul);
+  return div;
+}
+
+async function jalankanPencarian() {
+  const q = $('#cari-input').value.trim();
+  const wadah = $('#cari-hasil');
+  wadah.innerHTML = '';
+  if (q.length < 2) return;
+
+  // 1) tikor langsung
+  const tikor = parseTikor(q);
+  if (tikor) {
+    menujuHasil(tikor.lat, tikor.lng, `Tikor ${tikor.lat.toFixed(6)}, ${tikor.lng.toFixed(6)}`);
+    return;
+  }
+
+  // 2) titik milik sendiri (survey + aset bawaan)
+  const kunci = q.toLowerCase();
+  const cocokkan = (teks) => (teks || '').toLowerCase().includes(kunci);
+  state.poles.filter(p => cocokkan(p.nama) || cocokkan(p.namaPelanggan) || cocokkan(p.catatan))
+    .slice(0, 5)
+    .forEach(p => wadah.appendChild(itemHasil(
+      p.mode === 'pelanggan' ? '👤' : p.mode === 'eksisting' ? '📋' : '🆕',
+      p.mode === 'pelanggan' ? (p.namaPelanggan || p.nama) : p.nama,
+      p.mode === 'pelanggan' ? `Calon pelanggan · ${p.nama}` : (p.mode === 'eksisting' ? 'Aset tersurvey' : 'Titik rencana'),
+      p.lat, p.lng)));
+  asetStatis.filter(p => cocokkan(p.nama)).slice(0, 5)
+    .forEach(p => wadah.appendChild(itemHasil('🗼', p.nama, 'Tiang TM (aset bawaan)', p.lat, p.lng)));
+
+  // 3) nama desa / tempat via Nominatim (OpenStreetMap)
+  const memuat = document.createElement('div');
+  memuat.className = 'hasil-cari';
+  memuat.innerHTML = '<span class="ik">🌐</span><div>Mencari nama lokasi…</div>';
+  wadah.appendChild(memuat);
+  try {
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=id&q='
+      + encodeURIComponent(q), { headers: { 'Accept-Language': 'id' } });
+    const daftar = await res.json();
+    memuat.remove();
+    if (!daftar.length && !wadah.children.length) {
+      wadah.innerHTML = '<div class="hasil-cari"><span class="ik">😕</span><div>Tidak ditemukan — coba kata lain atau masukkan tikor.</div></div>';
+    }
+    daftar.forEach(t => wadah.appendChild(itemHasil('📍',
+      (t.display_name || '').split(',').slice(0, 2).join(','),
+      (t.display_name || '').split(',').slice(2, 5).join(',').trim(),
+      parseFloat(t.lat), parseFloat(t.lon))));
+  } catch (e) {
+    memuat.innerHTML = '<span class="ik">📵</span><div>Pencarian nama lokasi butuh internet — pencarian tikor & nama titik tetap bisa.</div>';
+  }
+}
+
+function togglePanelCari() {
+  const panel = $('#panel-cari');
+  const tampil = panel.classList.toggle('sembunyi');
+  if (!tampil) { $('#cari-input').focus(); }
+  else if (markerCari) { map.removeLayer(markerCari); markerCari = null; }
+}
+
 // ---------------- MODAL ----------------
 function bukaModal(id) { $('#' + id).classList.add('tampil'); }
 function tutupModal(id) { $('#' + id).classList.remove('tampil'); }
@@ -1839,6 +1927,10 @@ document.addEventListener('DOMContentLoaded', () => {
     toast(modeTaging ? 'Ketuk peta untuk menaruh tiang' : 'Mode taging dimatikan');
   };
   $('#btn-rab').onclick = renderRAB;
+  $('#btn-cari').onclick = togglePanelCari;
+  $('#cari-tombol').onclick = jalankanPencarian;
+  $('#cari-tutup').onclick = togglePanelCari;
+  $('#cari-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') jalankanPencarian(); });
   $('#btn-koreksi').onclick = toggleModeKoreksi;
   $('#btn-live').onclick = mulaiLive;
   $('#lv-stop').onclick = stopLive;

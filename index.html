@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
 
@@ -18,11 +18,23 @@
     <div class="judul">CAKRA<small>Cepat • Tepat • Akurat — Survey Aset Distribusi</small></div>
     <span id="badge-offline" class="sembunyi" title="Tidak ada internet — taging & GPS tetap berfungsi, data tersimpan di HP">📵 OFFLINE</span>
     <div class="spacer"></div>
+    <button class="tombol-bar" id="btn-cari" title="Cari desa / lokasi / tikor">🔍</button>
     <button class="tombol-bar" id="btn-daftar">📋 Tiang</button>
     <button class="tombol-bar" id="btn-rab">💰 RAB</button>
+    <a class="tombol-bar" id="btn-dasbor" href="dasbor.html" title="Dasbor manajemen" style="text-decoration:none">📊</a>
     <button class="tombol-bar" id="btn-pengaturan">⚙️</button>
     <button class="tombol-bar" id="btn-ekspor">📤</button>
   </header>
+
+  <!-- ===== PANEL PENCARIAN ===== -->
+  <div id="panel-cari" class="sembunyi">
+    <div class="cari-baris">
+      <input type="text" id="cari-input" placeholder="Cari desa / lokasi / nama titik / tikor (-3.33, 128.95)" autocomplete="off">
+      <button class="tombol utama" id="cari-tombol">Cari</button>
+      <button class="tombol polos" id="cari-tutup">×</button>
+    </div>
+    <div id="cari-hasil"></div>
+  </div>
 
   <!-- ===== PETA ===== -->
   <div id="map"></div>
@@ -251,8 +263,8 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=13"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/data.js?v=14"></script>
+  <script src="js/app.js?v=14"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

@@ -269,10 +269,124 @@ function renderTabelUsulan() {
   });
 }
 
+// ---------------- tabel calon pelanggan + eviden ----------------
+function bukaLightbox(src, ket) {
+  const lb = document.querySelector('#lightbox');
+  lb.querySelector('img').src = src;
+  lb.querySelector('.ket').textContent = ket;
+  lb.classList.add('tampil');
+}
+
+function renderTabelPelanggan() {
+  const wadah = $('#d-tabel-pelanggan');
+  const daftar = poles.filter(p => p.mode === 'pelanggan');
+  if (!daftar.length) {
+    wadah.innerHTML = '<p class="catatan-kecil">Belum ada calon pelanggan — taging lewat aplikasi survey (mode 👤 Calon Pelanggan).</p>';
+    return;
+  }
+  let html = `<table class="rab"><tr>
+    <th>Kode</th><th>Nama (sesuai KTP)</th><th>Kelengkapan</th>`;
+  Object.values(EVIDEN_PELANGGAN).forEach(l => { html += `<th>${l}</th>`; });
+  html += `<th>Petugas</th><th>Catatan</th><th>Peta</th></tr>`;
+  daftar.forEach((p, i) => {
+    const f = p.fotoPelanggan || {};
+    const lengkap = Object.keys(EVIDEN_PELANGGAN).filter(k => f[k]).length;
+    const total = Object.keys(EVIDEN_PELANGGAN).length;
+    html += `<tr>
+      <td>${p.nama}</td>
+      <td><b>${p.namaPelanggan || '—'}</b></td>
+      <td><span class="badge-skor" style="background:${lengkap === total ? '#2e7d32' : '#f57c00'}">${lengkap}/${total}</span></td>`;
+    Object.entries(EVIDEN_PELANGGAN).forEach(([kode, label]) => {
+      html += `<td>${f[kode]
+        ? `<img class="eviden-mini" data-cp="${i}" data-ev="${kode}" src="${f[kode]}" alt="${label}">`
+        : '<span class="eviden-kosong">belum</span>'}</td>`;
+    });
+    html += `<td>${p.petugas || '—'}</td><td>${p.catatan || ''}</td>
+      <td><button class="tombol polos kecil" data-fokus="${i}">📍</button></td></tr>`;
+  });
+  html += '</table>';
+  wadah.innerHTML = html;
+
+  wadah.querySelectorAll('.eviden-mini').forEach(img => {
+    img.onclick = () => {
+      const p = daftar[Number(img.dataset.cp)];
+      bukaLightbox(img.src, `${p.namaPelanggan || p.nama} — ${EVIDEN_PELANGGAN[img.dataset.ev]}`);
+    };
+  });
+  wadah.querySelectorAll('[data-fokus]').forEach(b => {
+    b.onclick = () => {
+      const p = daftar[Number(b.dataset.fokus)];
+      peta.setView([p.lat, p.lng], 17);
+      document.querySelector('#peta-dasbor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+  });
+}
+
+// ---------------- pencarian lokasi ----------------
+let markerCari = null;
+
+function parseTikor(q) {
+  const m = q.trim().match(/^(-?\d{1,3}(?:[.,]\d+)?)[\s,;]+(-?\d{1,3}(?:[.,]\d+)?)$/);
+  if (!m) return null;
+  const lat = parseFloat(m[1].replace(',', '.'));
+  const lng = parseFloat(m[2].replace(',', '.'));
+  if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
+}
+
+function menujuHasil(lat, lng, label) {
+  if (markerCari) peta.removeLayer(markerCari);
+  markerCari = L.circleMarker([lat, lng], { radius: 11, color: '#d81b60', weight: 4, fill: false })
+    .bindPopup(`<b>${label}</b>`).addTo(peta);
+  peta.setView([lat, lng], 16);
+  markerCari.openPopup();
+  $('#d-cari-hasil').innerHTML = '';
+  document.querySelector('#peta-dasbor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function jalankanPencarian() {
+  const q = $('#d-cari').value.trim();
+  const wadah = $('#d-cari-hasil');
+  wadah.innerHTML = '';
+  if (q.length < 2) return;
+  const tikor = parseTikor(q);
+  if (tikor) { menujuHasil(tikor.lat, tikor.lng, `Tikor ${tikor.lat.toFixed(6)}, ${tikor.lng.toFixed(6)}`); return; }
+
+  const kunci = q.toLowerCase();
+  const cocokkan = (t) => (t || '').toLowerCase().includes(kunci);
+  const item = (ikon, judul, ket, lat, lng) => {
+    const div = document.createElement('div');
+    div.className = 'hasil-cari';
+    div.innerHTML = `<span class="ik">${ikon}</span><div><div>${judul}</div><div class="ket-hasil">${ket}</div></div>`;
+    div.onclick = () => menujuHasil(lat, lng, judul);
+    return div;
+  };
+  poles.filter(p => cocokkan(p.nama) || cocokkan(p.namaPelanggan) || cocokkan(p.catatan)).slice(0, 5)
+    .forEach(p => wadah.appendChild(item(p.mode === 'pelanggan' ? '👤' : '📌',
+      p.mode === 'pelanggan' ? (p.namaPelanggan || p.nama) : p.nama,
+      p.mode, p.lat, p.lng)));
+  asetStatis.filter(p => cocokkan(p.nama)).slice(0, 5)
+    .forEach(p => wadah.appendChild(item('🗼', p.nama, 'Tiang TM (aset bawaan)', p.lat, p.lng)));
+  try {
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=id&q='
+      + encodeURIComponent(q), { headers: { 'Accept-Language': 'id' } });
+    (await res.json()).forEach(t => wadah.appendChild(item('📍',
+      (t.display_name || '').split(',').slice(0, 2).join(','),
+      (t.display_name || '').split(',').slice(2, 5).join(',').trim(),
+      parseFloat(t.lat), parseFloat(t.lon))));
+  } catch (e) {
+    toast('Pencarian nama lokasi butuh internet — tikor & nama titik tetap bisa');
+  }
+  if (!wadah.children.length) {
+    wadah.innerHTML = '<div class="hasil-cari"><span class="ik">😕</span><div>Tidak ditemukan.</div></div>';
+  }
+}
+
 function renderSemua() {
   renderPeta();
   renderRingkasan();
   renderTabelUsulan();
+  renderTabelPelanggan();
 }
 
 // ---------------- sumber data ----------------
@@ -372,6 +486,10 @@ document.addEventListener('DOMContentLoaded', () => {
       poles = []; koreksi = []; sudahFit = false; renderSemua();
     }
   };
+
+  $('#d-cari-tombol').onclick = jalankanPencarian;
+  $('#d-cari').addEventListener('keydown', (e) => { if (e.key === 'Enter') jalankanPencarian(); });
+  document.querySelector('#lightbox').onclick = () => document.querySelector('#lightbox').classList.remove('tampil');
 
   renderSemua();
   muatAsetStatis();

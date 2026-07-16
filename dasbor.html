@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/style.css?v=14">
   <style>
     /* tata letak khusus dasbor: halaman menggulir, peta di panel */
     body { overflow: auto; background: var(--abu); }
@@ -24,6 +24,16 @@
     .baris-alat select { border: 1px solid #c6d0da; border-radius: 8px; padding: 8px; font-size: 13px; }
     table.rab select { border: 1px solid #c6d0da; border-radius: 6px; padding: 4px 6px; font-size: 12px; }
     .foto-mini { width: 62px; height: 62px; object-fit: cover; border-radius: 6px; margin: 2px; }
+    .eviden-mini { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; cursor: zoom-in; border: 1px solid #c6d0da; }
+    .eviden-kosong { display: inline-block; width: 46px; height: 46px; border-radius: 6px; background: #eef2f6; text-align: center; line-height: 46px; color: #9aa9b8; font-size: 10px; }
+    #lightbox {
+      position: fixed; inset: 0; z-index: 2000; display: none;
+      background: rgba(10,20,30,.85); cursor: zoom-out;
+      align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    }
+    #lightbox.tampil { display: flex; }
+    #lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 10px; }
+    #lightbox .ket { color: #fff; font-size: 14px; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -61,7 +71,17 @@
 
     <div class="panel">
       <div class="judul-seksi">Peta Sebaran Aset</div>
+      <div class="baris-alat" style="margin-bottom:8px">
+        <input type="text" id="d-cari" placeholder="Cari desa / lokasi / nama titik / tikor (-3.33, 128.95)" autocomplete="off">
+        <button class="tombol utama" id="d-cari-tombol">🔍 Cari</button>
+      </div>
+      <div id="d-cari-hasil"></div>
       <div id="peta-dasbor"></div>
+    </div>
+
+    <div class="panel">
+      <div class="judul-seksi">Calon Pelanggan &amp; Eviden</div>
+      <div class="bungkus-tabel" id="d-tabel-pelanggan"></div>
     </div>
 
     <div class="panel">
@@ -77,9 +97,10 @@
   </div>
 
   <div id="toast"></div>
+  <div id="lightbox"><img alt="eviden"><div class="ket"></div></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=13"></script>
-  <script src="js/dasbor.js?v=13"></script>
+  <script src="js/data.js?v=14"></script>
+  <script src="js/dasbor.js?v=14"></script>
 </body>
 </html>
