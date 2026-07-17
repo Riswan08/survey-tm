@@ -2011,6 +2011,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // pengaturan
   $('#s-simpan').onclick = simpanPengaturan;
   $('#s-reset').onclick = resetHarga;
+  $('#s-keluar').onclick = () => { if (confirm('Keluar dari sesi ini? Data survey di perangkat tetap aman.')) keluarSesi(); };
   const terapkanIsianSync = () => {
     state.settings.petugas = $('#s-petugas').value.trim().slice(0, 40);
     state.settings.server = $('#s-server').value.trim().slice(0, 200);

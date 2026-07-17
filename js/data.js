@@ -392,6 +392,14 @@ const KONDISI = {
 };
 
 // ------------------------------------------------------------
+// KODE AKSES APLIKASI (layar masuk)
+// Yang disimpan hanya HASH SHA-256-nya — kode aslinya tidak terbaca di sini.
+// Ganti kode: buka konsol browser di aplikasi → ketik  await cakraHash('KODEBARU')
+// → salin hasilnya ke sini, lalu deploy ulang.
+// ------------------------------------------------------------
+const KODE_AKSES_HASH = 'b81839083d0f0627a97f534bbd8d934dd05714eb7dfa12a844b20202462d9916';
+
+// ------------------------------------------------------------
 // PENGATURAN BAWAAN
 // ------------------------------------------------------------
 const DEFAULT_SETTINGS = {
