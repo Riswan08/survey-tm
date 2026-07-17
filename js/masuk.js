@@ -52,19 +52,21 @@ function tampilkanLayarMasuk() {
     const galat = layar.querySelector('#m-galat');
     if (!petugas) { galat.textContent = 'Isi nama petugas dulu.'; galat.classList.remove('sembunyi'); return; }
     if (!kode) { galat.textContent = 'Isi kode akses.'; galat.classList.remove('sembunyi'); return; }
-    if (await cakraHash(kode) !== KODE_AKSES_HASH) {
+    const ulp = KODE_AKSES[await cakraHash(kode)];
+    if (!ulp) {
       galat.textContent = 'Kode akses salah — hubungi admin unit.';
       galat.classList.remove('sembunyi');
       layar.querySelector('#m-kode').value = '';
       return;
     }
-    localStorage.setItem(SESI_KUNCI, JSON.stringify({ petugas: petugas.slice(0, 40), masuk: Date.now() }));
+    localStorage.setItem(SESI_KUNCI, JSON.stringify({ petugas: petugas.slice(0, 40), ulp, masuk: Date.now() }));
     // nama petugas login otomatis menstempel titik survey (jika halaman aplikasi)
     if (typeof state !== 'undefined' && state.settings && !state.settings.petugas) {
       state.settings.petugas = petugas.slice(0, 40);
       if (typeof simpan === 'function') simpan();
     }
     layar.remove();
+    if (typeof toast === 'function') toast(`Selamat datang, ${petugas.slice(0, 40)} — ${ulp}`);
   };
   layar.querySelector('#m-masuk').onclick = proses;
   layar.querySelectorAll('input').forEach(i =>

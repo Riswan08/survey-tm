@@ -392,12 +392,18 @@ const KONDISI = {
 };
 
 // ------------------------------------------------------------
-// KODE AKSES APLIKASI (layar masuk)
+// KODE AKSES APLIKASI per ULP (layar masuk)
 // Yang disimpan hanya HASH SHA-256-nya — kode aslinya tidak terbaca di sini.
-// Ganti kode: buka konsol browser di aplikasi → ketik  await cakraHash('KODEBARU')
-// → salin hasilnya ke sini, lalu deploy ulang.
+// Kode yang dipakai menentukan ULP pengguna (tercatat di sesi).
+// Ganti/tambah kode: konsol browser → await cakraHash('KODEBARU') → tempel ke sini.
 // ------------------------------------------------------------
-const KODE_AKSES_HASH = 'b81839083d0f0627a97f534bbd8d934dd05714eb7dfa12a844b20202462d9916';
+const KODE_AKSES = {
+  '02bafe81c5cbd71611dd1b2178a2410e2d003f727015035c3e9003468863944a': 'ULP Piru',
+  '7ae0865f53528ddf750b5728e3570e0713cb235a782ec1387e422cbf9d7e38a7': 'ULP Masohi',
+  '5b7a436e2ca4a8c8135f4f6513b23f5dce679b23277ec5dd58083b4323167d12': 'ULP Kairatu',
+  '7fbe9da3f554d892d8d487d0c0b0e38362bdf9d8b2a4a6619c0be8b2540cf776': 'ULP Kobisonta',
+  '769e88a66014f9d0f61f37d013a2a177bcdd77f5e95a05ea394efe27624e9abc': 'ULP Bula',
+};
 
 // ------------------------------------------------------------
 // PENGATURAN BAWAAN
