@@ -112,7 +112,36 @@ async function muatAsetStatis() {
 }
 
 // ---------------- peta ----------------
-let peta, layerTitik, sudahFit = false;
+let peta, layerTitik, layerAsetD, sudahFit = false;
+let cacheMarkerAsetD = new Map(); // marker aset bawaan — dibangun sekali
+const ZOOM_MIN_MARKER_ASET = 13;  // di bawah ini marker aset disembunyikan (LOD)
+let lodTampilD = true;
+
+function renderAsetDasbor(tersurvey) {
+  if (!layerAsetD) return;
+  if (!cacheMarkerAsetD.size && asetStatis.length) {
+    asetStatis.forEach(p => {
+      const cm = L.circleMarker([p.lat, p.lng], { radius: 3.5, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .9 })
+        .bindPopup(`<b>${p.nama}</b> — Tiang TM (aset)<br>${p.catatan || ''}`);
+      cm.addTo(layerAsetD);
+      cacheMarkerAsetD.set(p.uid, cm);
+    });
+  }
+  cacheMarkerAsetD.forEach((cm, uid) => {
+    const sembunyikan = tersurvey.has(uid);
+    const tampil = layerAsetD.hasLayer(cm);
+    if (sembunyikan && tampil) layerAsetD.removeLayer(cm);
+    else if (!sembunyikan && !tampil) layerAsetD.addLayer(cm);
+  });
+}
+
+function aturLodAsetD() {
+  const tampil = peta.getZoom() >= ZOOM_MIN_MARKER_ASET;
+  if (tampil === lodTampilD) return;
+  lodTampilD = tampil;
+  if (tampil) { if (!peta.hasLayer(layerAsetD)) peta.addLayer(layerAsetD); }
+  else { if (peta.hasLayer(layerAsetD)) peta.removeLayer(layerAsetD); }
+}
 
 function initPeta() {
   peta = L.map('peta-dasbor', { preferCanvas: true }).setView([-3.3, 128.95], 11);
@@ -122,7 +151,10 @@ function initPeta() {
   const satelit = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Esri' });
   voyager.addTo(peta);
   L.control.layers({ 'Peta Jalan': voyager, 'OpenStreetMap': osm, 'Satelit': satelit }).addTo(peta);
+  layerAsetD = L.layerGroup().addTo(peta);
   layerTitik = L.layerGroup().addTo(peta);
+  peta.on('zoomend', aturLodAsetD);
+  aturLodAsetD(); // zoom awal 11 < 13 → marker aset mulai tersembunyi
 }
 
 function popupHTML(p) {
@@ -180,15 +212,11 @@ function renderPeta() {
   });
   const segmen = [];
   edges.forEach(([a, b]) => segmen.push([[posisi.get(a).lat, posisi.get(a).lng], [posisi.get(b).lat, posisi.get(b).lng]]));
-  if (segmen.length) L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85 }).addTo(layerTitik); // kabel: hijau
+  if (segmen.length) L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerTitik);
 
-  // marker aset bawaan (abu-abu) — yang tersurvey tampil sebagai marker survey
-  asetStatis.forEach(p => {
-    if (tersurvey.has(p.uid)) return;
-    L.circleMarker([p.lat, p.lng], { radius: 3.5, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .9 })
-      .bindPopup(`<b>${p.nama}</b> — Tiang TM (aset)<br>${p.catatan || ''}`)
-      .addTo(layerTitik);
-  });
+  // marker aset bawaan: di layer terpisah, dibangun sekali, disembunyikan saat
+  // yang tersurvey berubah / zoom jauh (level-of-detail)
+  renderAsetDasbor(tersurvey);
   poles.forEach(p => {
     const warna = p.mode === 'pelanggan'
       ? '#7b1fa2'

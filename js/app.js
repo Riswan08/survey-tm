@@ -258,6 +258,9 @@ function initPeta() {
   map.on('baselayerchange', (e) => {
     tileAktif = e.name === 'Satelit' ? 'esri' : (e.name === 'OpenStreetMap' ? 'osm' : 'carto');
   });
+  // level-of-detail: di zoom jauh, marker aset (28 rb titik) disembunyikan
+  // agar zoom/geser tetap mulus — garis jaringan tetap tampil sebagai gambaran umum
+  map.on('zoomend', aturLodAset);
   map.on('click', (e) => {
     if (modeTaging) bukaFormTiang(null, e.latlng);
   });
@@ -289,6 +292,17 @@ async function muatAsetStatis() {
 // marker aset dibangun SEKALI (28 rb titik ≈ 1 dtk), lalu tiap render
 // hanya disinkronkan: sembunyikan yang tersurvey & sesuaikan mode koreksi.
 let cacheMarkerAset = new Map(); // uid -> { cm, p }
+
+const ZOOM_MIN_MARKER_ASET = 13;
+let lodMarkerTampil = true;
+
+function aturLodAset() {
+  const tampil = map.getZoom() >= ZOOM_MIN_MARKER_ASET;
+  if (tampil === lodMarkerTampil) return;
+  lodMarkerTampil = tampil;
+  if (tampil) { if (!map.hasLayer(layerAset)) map.addLayer(layerAset); }
+  else { if (map.hasLayer(layerAset)) map.removeLayer(layerAset); }
+}
 
 function renderAsetStatis() {
   if (!layerAset) return;
@@ -570,7 +584,8 @@ function render() {
     segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
   });
   if (segmen.length) {
-    L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85 }).addTo(layerGaris); // kabel jaringan: hijau
+    // smoothFactor tinggi = garis disederhanakan saat digambar → zoom jauh tetap mulus
+    L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerGaris);
   }
 
   // garis suplai: rencana baru mengambil listrik dari tiang eksisting terdekat
