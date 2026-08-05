@@ -2377,6 +2377,15 @@ function tinggiTiang(kode) {
 
 function konstruksiTR(kode) { return (KONSTRUKSI[kode] || {}).grup === 'JTR'; }
 
+// arah layar (x ke kanan, y ke bawah) dari titik a menuju b — untuk menaruh
+// lencana/label tegak lurus rute agar tidak menutupi titik taging
+function arahLayar(a, b) {
+  const dx = (b.lng - a.lng) * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+  const dy = -(b.lat - a.lat);
+  const n = Math.hypot(dx, dy) || 1;
+  return { x: dx / n, y: dy / n };
+}
+
 // simbol trafo seperti template gambar unit: kotak trafo (pentagon) di atas tiang
 function svgTrafo(jenis, warna) {
   if (jenis === 'TRAFO_PORTAL') {
@@ -2419,8 +2428,13 @@ function gambarLembar() {
       color: WARNA_LEMBAR.rencana, weight: 4,
       dashArray: segTR ? '8 8' : null,
     }).addTo(layerLembar);
+    // label jarak digeser tegak lurus ke KIRI arah rute — menjauh dari lencana (sisi kanan)
+    const dirJ = arahLayar(a, b);
     L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
-      icon: L.divIcon({ className: 'lg-jarak', html: `${angka(haversine(a, b), 0)}`, iconSize: null }),
+      icon: L.divIcon({
+        className: 'lg-jarak', html: `${angka(haversine(a, b), 0)}`, iconSize: null,
+        iconAnchor: [13 - dirJ.y * 20, 8 + dirJ.x * 20],
+      }),
       interactive: false,
     }).addTo(layerLembar);
   }
@@ -2440,10 +2454,12 @@ function gambarLembar() {
   // nomor lencana = urutan per jenis konstruksi (TM-1 pertama = 1, kedua = 2, dst. —
   // tiap jenis dihitung terpisah), sesuai input saat taging
   const urutanKonstruksi = new Map();
+  const indeksRencana = new Map(); // uid -> posisi di rute (untuk arah & sisi lencana)
   const hitungJenis = {};
-  rencana.forEach(p => {
+  rencana.forEach((p, i) => {
     hitungJenis[p.konstruksi] = (hitungJenis[p.konstruksi] || 0) + 1;
     urutanKonstruksi.set(p.uid, hitungJenis[p.konstruksi]);
+    indeksRencana.set(p.uid, i);
   });
   state.poles.forEach(p => {
     if (p.mode === 'pelanggan') return; // calon pelanggan tidak masuk gambar rencana
@@ -2458,7 +2474,7 @@ function gambarLembar() {
         interactive: false,
       }).addTo(layerLembar);
     } else {
-      L.circleMarker([p.lat, p.lng], { radius: 8, weight: 2, color: '#fff', fillColor: warna, fillOpacity: 1 })
+      L.circleMarker([p.lat, p.lng], { radius: 6.5, weight: 1.5, color: '#fff', fillColor: warna, fillOpacity: 1 })
         .addTo(layerLembar);
     }
     if (eksisting) {
@@ -2468,14 +2484,21 @@ function gambarLembar() {
         interactive: false,
       }).addTo(layerLembar);
     } else {
-      // lencana konstruksi: kode di atas, "urutan jenis | tinggi tiang" di bawah,
-      // ditaruh di bawah titik dengan jarak — tidak menutupi tikor
+      // lencana konstruksi: kode di atas, "urutan jenis | tinggi tiang" di bawah.
+      // Dipasang MENYAMPING tegak lurus arah rute, berselang-seling kiri/kanan —
+      // titik taging, garis, dan label jarak tetap terlihat walau tiang berdekatan.
+      const i = indeksRencana.get(p.uid) || 0;
+      const sebelum = rencana[i - 1], sesudah = rencana[i + 1];
+      const dir = sesudah ? arahLayar(p, sesudah) : (sebelum ? arahLayar(sebelum, p) : { x: 0, y: -1 });
+      const sisi = i % 2 ? -1 : 1; // ganjil kiri, genap kanan
+      const J = 56;                 // jarak lencana dari titik (px)
+      const ox = -dir.y * J * sisi, oy = dir.x * J * sisi;
       L.marker([p.lat, p.lng], {
         icon: L.divIcon({
           className: '',
           html: `<div class="lg-badge"><div class="k">${p.konstruksi.replace('-', '')}</div>
                  <div class="b">${urutanKonstruksi.get(p.uid) || 1} | ${tinggiTiang(p.tiang)}</div></div>`,
-          iconSize: [48, 48], iconAnchor: [24, -16],
+          iconSize: [44, 44], iconAnchor: [22 - ox, 22 - oy],
         }),
         interactive: false,
       }).addTo(layerLembar);
