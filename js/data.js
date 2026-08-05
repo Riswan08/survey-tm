@@ -315,6 +315,18 @@ const TEMUAN = {
     G_RAMBU:    { nama: 'Rambu pengaman tidak ada',            paket: 'PASANG_RAMBU' },
     G_LBS:      { nama: 'Perlu LBS untuk manuver',             paket: 'PASANG_LBS' },
   },
+  TRAFO_CANTOL: {
+    TC_GROUNDING:{ nama: 'Grounding arrester rusak / hilang',  paket: 'PASANG_GROUNDING_ARR' },
+    TC_FCO:      { nama: 'FCO / dudukan keropos / rusak',      paket: 'GANTI_DUDUKAN_FCO' },
+    TC_TIANG:    { nama: 'Tiang dudukan keropos / miring',     paket: 'PASANG_TOPANG_TARIK' },
+    TC_RAMBU:    { nama: 'Rambu pengaman tidak ada',           paket: 'PASANG_RAMBU' },
+  },
+  TRAFO_PORTAL: {
+    TP_GROUNDING:{ nama: 'Grounding arrester rusak / hilang',  paket: 'PASANG_GROUNDING_ARR' },
+    TP_FCO:      { nama: 'FCO / dudukan keropos / rusak',      paket: 'GANTI_DUDUKAN_FCO' },
+    TP_TIANG:    { nama: 'Tiang portal keropos / miring',      paket: 'PASANG_TOPANG_TARIK' },
+    TP_RAMBU:    { nama: 'Rambu pengaman tidak ada',           paket: 'PASANG_RAMBU' },
+  },
   PENGHANTAR: {
     P_RANTAS:   { nama: 'Kawat rantas / burik',                paket: 'PERBAIKI_JUMPER' },
     P_JUMPER:   { nama: 'Jumper kendor / titik panas',         paket: 'PERBAIKI_JUMPER' },
@@ -379,6 +391,8 @@ const JENIS_ASET = {
   TIANG_TM:   { nama: 'Tiang TM',                 ikon: '🗼' },
   TIANG_TR:   { nama: 'Tiang TR (Tegangan Rendah)', ikon: '🕯️' },
   GARDU:      { nama: 'Gardu Distribusi',         ikon: '🏠' },
+  TRAFO_CANTOL: { nama: 'Trafo Cantol (1 tiang)', ikon: '🔌' },
+  TRAFO_PORTAL: { nama: 'Trafo Portal (2 tiang)', ikon: '⛩️' },
   PENGHANTAR: { nama: 'Penghantar / Seksi Jaringan', ikon: '➿' },
   PENGAMAN:   { nama: 'Pengaman (Arrester / FCO)', ikon: '🛡️' },
   GROUNDING:  { nama: 'Grounding / Pentanahan',   ikon: '⏚' },

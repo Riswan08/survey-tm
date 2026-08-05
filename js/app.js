@@ -2377,6 +2377,19 @@ function tinggiTiang(kode) {
 
 function konstruksiTR(kode) { return (KONSTRUKSI[kode] || {}).grup === 'JTR'; }
 
+// simbol trafo seperti template gambar unit: kotak trafo (pentagon) di atas tiang
+function svgTrafo(jenis, warna) {
+  if (jenis === 'TRAFO_PORTAL') {
+    return `<svg width="26" height="26" viewBox="0 0 26 26">
+      <path d="M3 13 h20 v-7 L13 1 L3 6 Z" fill="${warna}" stroke="#fff" stroke-width="1.2"/>
+      <rect x="6" y="13" width="2.4" height="11" fill="${warna}" stroke="#fff" stroke-width=".8"/>
+      <rect x="17.6" y="13" width="2.4" height="11" fill="${warna}" stroke="#fff" stroke-width=".8"/></svg>`;
+  }
+  return `<svg width="16" height="26" viewBox="0 0 16 26">
+    <path d="M2 12 h12 v-6 L8 1 L2 6 Z" fill="${warna}" stroke="#fff" stroke-width="1.2"/>
+    <rect x="6.8" y="12" width="2.4" height="12" fill="${warna}" stroke="#fff" stroke-width=".8"/></svg>`;
+}
+
 function gambarLembar() {
   layerLembar.clearLayers();
   const s = state.settings;
@@ -2427,8 +2440,17 @@ function gambarLembar() {
     const eksisting = p.mode === 'eksisting';
     const rehab = eksisting && (p.usulan || []).length > 0;
     const warna = eksisting ? (rehab ? WARNA_LEMBAR.rehab : WARNA_LEMBAR.eksisting) : WARNA_LEMBAR.rencana;
-    L.circleMarker([p.lat, p.lng], { radius: 8, weight: 2, color: '#fff', fillColor: warna, fillOpacity: 1 })
-      .addTo(layerLembar);
+    const trafo = p.jenisAset === 'TRAFO_CANTOL' || p.jenisAset === 'TRAFO_PORTAL';
+    if (eksisting && trafo) {
+      // simbol trafo cantol/portal seperti legenda template
+      L.marker([p.lat, p.lng], {
+        icon: L.divIcon({ className: '', html: svgTrafo(p.jenisAset, warna), iconSize: [26, 26], iconAnchor: [13, 24] }),
+        interactive: false,
+      }).addTo(layerLembar);
+    } else {
+      L.circleMarker([p.lat, p.lng], { radius: 8, weight: 2, color: '#fff', fillColor: warna, fillOpacity: 1 })
+        .addTo(layerLembar);
+    }
     if (eksisting) {
       // nomor/nama tiang eksisting di atas titiknya
       L.marker([p.lat, p.lng], {
