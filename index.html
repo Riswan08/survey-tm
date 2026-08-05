@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=27">
+  <link rel="stylesheet" href="css/style.css?v=28">
 </head>
 <body>
 
@@ -319,12 +319,16 @@
       </div>
       <div class="lembar-side">
         <div class="ls-logo">
-          <svg viewBox="0 0 60 74" width="52" aria-label="PLN">
-            <rect x="2" y="2" width="56" height="56" rx="4" fill="#ffd400" stroke="#c9a800" stroke-width="1"/>
-            <path d="M33 6 L18 32 L27 32 L22 54 L42 26 L32 26 L38 6 Z" fill="#e01b22"/>
-            <path d="M8 40 q7 -6 14 0 t14 0 t14 0 v6 q-7 6 -14 0 t-14 0 t-14 0 Z" fill="#1866b4" opacity=".9"/>
-            <text x="30" y="72" text-anchor="middle" font-size="13" font-weight="800" fill="#1866b4" font-family="Arial">PLN</text>
+          <svg viewBox="0 0 100 100" width="54" aria-label="Lambang PLN">
+            <rect width="100" height="100" fill="#fce300"/>
+            <g fill="#29aae1">
+              <path d="M15 36 q11.5 -9 23 0 t23 0 t23 0 v8 q-11.5 9 -23 0 t-23 0 t-23 0 Z"/>
+              <path d="M15 51 q11.5 -9 23 0 t23 0 t23 0 v8 q-11.5 9 -23 0 t-23 0 t-23 0 Z"/>
+              <path d="M15 66 q11.5 -9 23 0 t23 0 t23 0 v8 q-11.5 9 -23 0 t-23 0 t-23 0 Z"/>
+            </g>
+            <path d="M44 3 L26 57 L37 55 L31 97 L61 41 L48 44 L58 3 Z" fill="#ed1c24"/>
           </svg>
+          <div style="font-size:15px;font-weight:800;color:#29aae1;letter-spacing:4px;margin-top:2px">PLN</div>
           <div class="ls-unit">UIW MALUKU DAN MALUKU UTARA<br>UP3 MASOHI<br><span id="lg-ulp">ULP MASOHI</span></div>
         </div>
         <div class="ls-baris"><small>JUDUL GAMBAR :</small><b id="lg-t-judul">—</b></div>
@@ -350,9 +354,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=27"></script>
-  <script src="js/app.js?v=27"></script>
-  <script src="js/masuk.js?v=27"></script>
+  <script src="js/data.js?v=28"></script>
+  <script src="js/app.js?v=28"></script>
+  <script src="js/masuk.js?v=28"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

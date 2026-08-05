@@ -2492,7 +2492,10 @@ function bukaLembarGambar() {
   isi('#lg-lokasi', s.namaPekerjaan);
   isi('#lg-digambar', s.petugas || sesi.petugas);
   isi('#lg-nomor', '1');
-  $('#lg-ulp').textContent = (sesi.ulp || 'ULP').toUpperCase();
+  // baris ULP dari sesi — disembunyikan bila sama dengan baris UP3 di atasnya (hindari dobel)
+  const ulpSesi = (sesi.ulp || '').toUpperCase();
+  $('#lg-ulp').textContent = ulpSesi;
+  $('#lg-ulp').style.display = (!ulpSesi || ulpSesi === 'UP3 MASOHI') ? 'none' : '';
   $('#lg-t-tanggal').textContent = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   perbaruiKopLembar();
 
