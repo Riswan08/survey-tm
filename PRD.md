@@ -1,12 +1,12 @@
-# PRD — CAKRA
-**C**erdas **A**nalisis **K**ebutuhan **R**encana **A**set
+# PRD — Si CAKRA
+**Si**stem **C**erdas **A**nalisis **K**ebutuhan **R**encana **A**set
 
 > **» CEPAT • TEPAT • AKURAT «**
 > Membuat aset distribusi PLN semakin handal melalui usulan perbaikan yang terukur di tiap aset.
 
 | | |
 |---|---|
-| **Nama produk** | CAKRA (Cerdas Analisis Kebutuhan Rencana Aset) |
+| **Nama produk** | Si CAKRA (Sistem Cerdas Analisis Kebutuhan Rencana Aset) |
 | **Unit** | PLN UIW Maluku dan Maluku Utara — UP3 Masohi |
 | **Platform** | Web PWA (mobile-first, offline-capable) — https://riswan08.github.io/survey-tm/ |
 | **Status dokumen** | Draft v1.0 — Juli 2026 |

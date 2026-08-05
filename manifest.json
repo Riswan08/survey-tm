@@ -1,6 +1,6 @@
 {
-  "name": "CAKRA — Cerdas Analisis Kebutuhan Rencana Aset",
-  "short_name": "CAKRA",
+  "name": "Si CAKRA — Sistem Cerdas Analisis Kebutuhan Rencana Aset",
+  "short_name": "Si CAKRA",
   "description": "Cepat • Tepat • Akurat — survey aset distribusi PLN dalam satu genggaman: taging GPS, kondisi aset, kebutuhan material otomatis, RAB akurat & terinci. Bekerja offline.",
   "start_url": "./index.html",
   "scope": "./",

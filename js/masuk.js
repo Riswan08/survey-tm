@@ -46,9 +46,9 @@ function tampilkanLayarMasuk() {
   layar.id = 'layar-masuk';
   layar.innerHTML = `
     <div class="kotak-masuk">
-      <img src="icons/logo.png" alt="CAKRA">
-      <h1>CAKRA</h1>
-      <p class="slogan">Cepat • Tepat • Akurat — Survey Aset Distribusi</p>
+      <img src="icons/logo.png" alt="Si CAKRA">
+      <h1>Si CAKRA</h1>
+      <p class="slogan">Sistem Cerdas Analisis Kebutuhan Rencana Aset<br>Cepat • Tepat • Akurat</p>
       <input type="text" id="m-petugas" maxlength="40" placeholder="Nama petugas / surveyor" autocomplete="name">
       <input type="password" id="m-kode" maxlength="60" placeholder="Kode akses unit" autocomplete="off">
       <button id="m-masuk" class="tombol utama">Masuk</button>

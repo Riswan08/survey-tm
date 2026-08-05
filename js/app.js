@@ -2000,7 +2000,7 @@ function eksporCSV() {
   const B = [];
   const baris = (...kolom) => B.push(kolom.join(';'));
 
-  baris('CAKRA - RAB SURVEY JARINGAN TM');
+  baris('Si CAKRA - RAB SURVEY JARINGAN TM');
   baris('Cepat - Tepat - Akurat');
   baris('Jenis Pekerjaan', JENIS_PEKERJAAN[s.jenisPekerjaan] || '');
   baris('Nama Pekerjaan', (s.namaPekerjaan || '-').replace(/;/g, ','));
@@ -2111,7 +2111,7 @@ function eksporKML() {
     </Placemark>`;
   }
   const kml = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>CAKRA — Survey Aset Distribusi</name>${plek}
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Si CAKRA — Survey Aset Distribusi</name>${plek}
 </Document></kml>`;
   unduh('CAKRA-Survey.kml', kml, 'application/vnd.google-earth.kml+xml');
   toast('Diekspor ke KML (buka di Google Earth)');
