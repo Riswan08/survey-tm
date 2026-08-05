@@ -92,7 +92,9 @@ Slogan **Cepat • Tepat • Akurat** diterjemahkan menjadi prinsip desain:
 - Akurasi GPS: multi-fix sampling, batas akurasi dengan konfirmasi, penjaga gawang
   (deteksi ketuk ganda & lompatan), jejak berjalan.
 - Offline penuh (PWA): app shell ter-cache, unduh peta area, data tersimpan di perangkat.
-- Ekspor: CSV/Excel (format RAB), KML (Google Earth), JSON (proyek).
+- Ekspor: CSV/Excel (format RAB), KML (Google Earth), JSON (proyek), dan **Gambar Rencana
+  cetak/PDF** bergaya template unit (citra satelit + jaringan berwarna eksisting/rencana/rehab,
+  lencana konstruksi per tiang, jarak gawang, kop keterangan + legenda) — ditambahkan di M5.
 
 ### Fase 2 — Aset Eksisting & Usulan Perbaikan *(inti CAKRA — berikutnya)*
 - **Inventarisasi aset eksisting**: taging aset terpasang (bukan hanya rencana) —

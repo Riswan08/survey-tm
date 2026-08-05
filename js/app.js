@@ -2362,6 +2362,137 @@ function togglePanelCari() {
   else if (markerCari) { map.removeLayer(markerCari); markerCari = null; }
 }
 
+// ---------------- LEMBAR GAMBAR RENCANA (CETAK / PDF) ----------------
+// Gambar rencana bergaya template unit: citra satelit + jaringan berwarna
+// (eksisting hitam, rencana baru biru, rehab hijau), lencana konstruksi per
+// tiang (kode + fasa|tinggi), jarak gawang, dan kop keterangan di sisi kanan.
+// Dicetak lewat dialog browser → "Save as PDF", A4 lanskap, margin none.
+const WARNA_LEMBAR = { eksisting: '#111111', rencana: '#1e88e5', rehab: '#2e7d32' };
+let petaLembar = null, layerLembar = null;
+
+function tinggiTiang(kode) {
+  const m = /(\d+)\s*m/.exec((MATERIALS[kode] || {}).nama || '');
+  return m ? m[1] : '12';
+}
+
+function konstruksiTR(kode) { return (KONSTRUKSI[kode] || {}).grup === 'JTR'; }
+
+function gambarLembar() {
+  layerLembar.clearLayers();
+  const s = state.settings;
+
+  // garis jaringan eksisting (aset bawaan + survey + koreksi) di sekitar proyek saja
+  const batas = L.latLngBounds(state.poles.map(p => [p.lat, p.lng])).pad(0.6);
+  const jaringan = sambunganFinal();
+  const segmenEks = [];
+  jaringan.edges.forEach(([a, b]) => {
+    const p = jaringan.posisi.get(a), q = jaringan.posisi.get(b);
+    if (batas.contains([p.lat, p.lng]) || batas.contains([q.lat, q.lng])) {
+      segmenEks.push([[p.lat, p.lng], [q.lat, q.lng]]);
+    }
+  });
+  if (segmenEks.length) {
+    L.polyline(segmenEks, { color: WARNA_LEMBAR.eksisting, weight: 3.5, smoothFactor: 2 }).addTo(layerLembar);
+  }
+
+  // rute rencana per gawang: SUTR (konstruksi JTR) putus-putus, SUTM utuh + label jarak
+  const rencana = polesRencana();
+  for (let i = 1; i < rencana.length; i++) {
+    const a = rencana[i - 1], b = rencana[i];
+    L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
+      color: WARNA_LEMBAR.rencana, weight: 4,
+      dashArray: (konstruksiTR(a.konstruksi) || konstruksiTR(b.konstruksi)) ? '8 8' : null,
+    }).addTo(layerLembar);
+    L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
+      icon: L.divIcon({ className: 'lg-jarak', html: `${angka(haversine(a, b), 0)}`, iconSize: null }),
+      interactive: false,
+    }).addTo(layerLembar);
+  }
+
+  // sambungan suplai dari jaringan eksisting
+  const suplai = suplaiTerdekat();
+  if (suplai) {
+    L.polyline([[suplai.dari.lat, suplai.dari.lng], [suplai.ke.lat, suplai.ke.lng]],
+      { color: WARNA_LEMBAR.rencana, weight: 3.5, dashArray: '4 8' }).addTo(layerLembar);
+    L.marker([(suplai.dari.lat + suplai.ke.lat) / 2, (suplai.dari.lng + suplai.ke.lng) / 2], {
+      icon: L.divIcon({ className: 'lg-jarak', html: `${angka(suplai.jarak, 0)}`, iconSize: null }),
+      interactive: false,
+    }).addTo(layerLembar);
+  }
+
+  // titik-titik: rencana biru + lencana konstruksi; eksisting hitam (hijau bila ada usulan/rehab)
+  const fasa = ((MATERIALS[s.penghantar] || {}).fasa) || 3;
+  state.poles.forEach(p => {
+    if (p.mode === 'pelanggan') return; // calon pelanggan tidak masuk gambar rencana
+    const eksisting = p.mode === 'eksisting';
+    const rehab = eksisting && (p.usulan || []).length > 0;
+    const warna = eksisting ? (rehab ? WARNA_LEMBAR.rehab : WARNA_LEMBAR.eksisting) : WARNA_LEMBAR.rencana;
+    L.circleMarker([p.lat, p.lng], { radius: 8, weight: 2, color: '#fff', fillColor: warna, fillOpacity: 1 })
+      .addTo(layerLembar);
+    if (eksisting) {
+      // nomor/nama tiang eksisting di atas titiknya
+      L.marker([p.lat, p.lng], {
+        icon: L.divIcon({ className: 'lg-nama', html: p.nama.replace(/^A-/, ''), iconAnchor: [-8, 22] }),
+        interactive: false,
+      }).addTo(layerLembar);
+    } else {
+      // lencana konstruksi: kode di atas, fasa | tinggi tiang di bawah
+      L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div class="lg-badge"><div class="k">${p.konstruksi.replace('-', '')}</div>
+                 <div class="b">${konstruksiTR(p.konstruksi) ? 1 : fasa} | ${tinggiTiang(p.tiang)}</div></div>`,
+          iconSize: [48, 48], iconAnchor: [-6, 60],
+        }),
+        interactive: false,
+      }).addTo(layerLembar);
+    }
+  });
+}
+
+function bukaLembarGambar() {
+  const titikGambar = state.poles.filter(p => p.mode !== 'pelanggan');
+  if (!titikGambar.length) { toast('Belum ada titik survey untuk digambar'); return; }
+  const s = state.settings;
+  const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
+
+  // pra-isi hanya bila kosong — isian pengguna dipertahankan selama halaman terbuka
+  const isi = (sel, nilai) => { const el = $(sel); if (!el.value) el.value = nilai || ''; };
+  isi('#lg-judul', (JENIS_PEKERJAAN[s.jenisPekerjaan] || 'Gambar Rencana').toUpperCase());
+  isi('#lg-lokasi', s.namaPekerjaan);
+  isi('#lg-digambar', s.petugas || sesi.petugas);
+  isi('#lg-nomor', '1');
+  $('#lg-ulp').textContent = (sesi.ulp || 'ULP').toUpperCase();
+  $('#lg-t-tanggal').textContent = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  perbaruiKopLembar();
+
+  $('#lembar-wrap').classList.remove('sembunyi');
+  if (!petaLembar) {
+    petaLembar = L.map('peta-lembar', { preferCanvas: true, zoomControl: true });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19, attribution: 'Esri World Imagery' }).addTo(petaLembar);
+    layerLembar = L.layerGroup().addTo(petaLembar);
+  }
+  gambarLembar();
+  setTimeout(() => {
+    petaLembar.invalidateSize();
+    petaLembar.fitBounds(titikGambar.map(p => [p.lat, p.lng]), { padding: [70, 70] });
+  }, 80);
+}
+
+function perbaruiKopLembar() {
+  const salin = (dari, ke) => { $(ke).textContent = $(dari).value.trim() || '—'; };
+  salin('#lg-judul', '#lg-t-judul');
+  salin('#lg-lokasi', '#lg-t-lokasi');
+  salin('#lg-digambar', '#lg-t-digambar');
+  salin('#lg-diperiksa', '#lg-t-diperiksa');
+  salin('#lg-disetujui', '#lg-t-disetujui');
+  salin('#lg-nomor', '#lg-t-nomor');
+  const judul = $('#lg-judul').value.trim();
+  const lokasi = $('#lg-lokasi').value.trim();
+  $('#lg-judul-peta').textContent = (judul + (lokasi ? ' ' + lokasi : '')).toUpperCase() || 'GAMBAR RENCANA';
+}
+
 // ---------------- MODAL ----------------
 function bukaModal(id) { $('#' + id).classList.add('tampil'); }
 function tutupModal(id) { $('#' + id).classList.remove('tampil'); }
@@ -2454,6 +2585,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ekspor
   $('#e-csv').onclick = eksporCSV;
   $('#e-kml').onclick = eksporKML;
+  $('#e-pdf').onclick = () => { tutupModal('modal-ekspor'); bukaLembarGambar(); };
+  $('#lg-cetak').onclick = () => window.print();
+  $('#lg-tutup').onclick = () => $('#lembar-wrap').classList.add('sembunyi');
+  ['#lg-judul', '#lg-lokasi', '#lg-digambar', '#lg-diperiksa', '#lg-disetujui', '#lg-nomor']
+    .forEach(sel => { $(sel).oninput = perbaruiKopLembar; });
   $('#e-tile').onclick = unduhTileArea;
   $('#e-json').onclick = eksporJSON;
   $('#e-impor').onchange = (e) => { if (e.target.files[0]) imporJSON(e.target.files[0]); e.target.value = ''; };

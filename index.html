@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=23">
+  <link rel="stylesheet" href="css/style.css?v=24">
 </head>
 <body>
 
@@ -259,6 +259,7 @@
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="tombol utama" id="e-csv">📊 Ekspor RAB ke CSV / Excel</button>
           <button class="tombol utama" id="e-kml">🌍 Ekspor Titik ke KML (Google Earth)</button>
+          <button class="tombol utama" id="e-pdf">📄 Gambar Rencana — Cetak / PDF (template unit)</button>
         </div>
         <div class="judul-seksi">Peta Offline</div>
         <p class="catatan-kecil" style="margin-bottom:10px">Sebelum ke lokasi tanpa sinyal: buka area kerja di peta, lalu unduh. Tile peta tersimpan di HP dan tampil saat offline. GPS &amp; taging selalu berfungsi walau peta belum diunduh.</p>
@@ -293,12 +294,63 @@
     </div>
   </div>
 
+  <!-- ===== LEMBAR GAMBAR RENCANA (CETAK / PDF) ===== -->
+  <div id="lembar-wrap" class="sembunyi">
+    <div class="lembar-alat no-cetak">
+      <div class="lembar-isian">
+        <input type="text" id="lg-judul" placeholder="Judul gambar (mis. PINDAH JARINGAN SUTM)" maxlength="60">
+        <input type="text" id="lg-lokasi" placeholder="Lokasi (mis. Jembatan Kawanoa - Tehoru)" maxlength="60">
+        <input type="text" id="lg-digambar" placeholder="Digambar oleh" maxlength="40">
+        <input type="text" id="lg-diperiksa" placeholder="Diperiksa oleh" maxlength="40">
+        <input type="text" id="lg-disetujui" placeholder="Disetujui oleh" maxlength="40">
+        <input type="text" id="lg-nomor" placeholder="Nomor gambar" maxlength="10" style="max-width:110px">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="tombol utama" id="lg-cetak">🖨 Cetak / Simpan PDF</button>
+        <button class="tombol polos" id="lg-tutup">× Tutup</button>
+      </div>
+      <p class="catatan-kecil" style="margin:6px 0 0">Atur peta (geser/zoom) persis seperti yang ingin dicetak, lalu 🖨 — pilih
+        <b>Save as PDF</b>, kertas <b>A4 Lanskap</b>, margin <b>None</b>. Butuh internet untuk citra satelit (atau tile yang sudah diunduh offline).</p>
+    </div>
+    <div class="lembar" id="lembar">
+      <div class="lembar-peta-wrap">
+        <div class="lembar-judul-peta" id="lg-judul-peta">JUDUL GAMBAR</div>
+        <div id="peta-lembar"></div>
+      </div>
+      <div class="lembar-side">
+        <div class="ls-logo">
+          <svg viewBox="0 0 60 74" width="52" aria-label="PLN">
+            <rect x="2" y="2" width="56" height="56" rx="4" fill="#ffd400" stroke="#c9a800" stroke-width="1"/>
+            <path d="M33 6 L18 32 L27 32 L22 54 L42 26 L32 26 L38 6 Z" fill="#e01b22"/>
+            <path d="M8 40 q7 -6 14 0 t14 0 t14 0 v6 q-7 6 -14 0 t-14 0 t-14 0 Z" fill="#1866b4" opacity=".9"/>
+            <text x="30" y="72" text-anchor="middle" font-size="13" font-weight="800" fill="#1866b4" font-family="Arial">PLN</text>
+          </svg>
+          <div class="ls-unit">UIW MALUKU DAN MALUKU UTARA<br>UP3 MASOHI<br><span id="lg-ulp">ULP MASOHI</span></div>
+        </div>
+        <div class="ls-baris"><small>JUDUL GAMBAR :</small><b id="lg-t-judul">—</b></div>
+        <div class="ls-baris"><small>LOKASI :</small><b id="lg-t-lokasi">—</b></div>
+        <div class="ls-baris"><small>DIGAMBAR OLEH :</small><b id="lg-t-digambar">—</b></div>
+        <div class="ls-baris"><small>DIPERIKSA OLEH :</small><b id="lg-t-diperiksa">—</b></div>
+        <div class="ls-baris"><small>DISETUJUI OLEH :</small><b id="lg-t-disetujui">—</b></div>
+        <div class="ls-baris"><small>TANGGAL :</small><b id="lg-t-tanggal">—</b></div>
+        <div class="ls-baris ls-legenda"><small>KETERANGAN GAMBAR :</small>
+          <div><span class="lg-kotak" style="background:#2e7d32"></span> Kode Warna Rencana Rehab</div>
+          <div><span class="lg-kotak" style="background:#1e88e5"></span> Kode Warna Rencana Baru</div>
+          <div><span class="lg-kotak" style="background:#111"></span> Kode Warna Eksisting</div>
+          <div><span class="lg-garis" style="border-top-style:dashed"></span> SUTR</div>
+          <div><span class="lg-garis"></span> SUTM</div>
+        </div>
+        <div class="ls-baris"><small>NOMOR GAMBAR :</small><b id="lg-t-nomor" style="font-size:15px;text-align:center">—</b></div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=23"></script>
-  <script src="js/app.js?v=23"></script>
-  <script src="js/masuk.js?v=23"></script>
+  <script src="js/data.js?v=24"></script>
+  <script src="js/app.js?v=24"></script>
+  <script src="js/masuk.js?v=24"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
