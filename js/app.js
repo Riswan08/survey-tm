@@ -2434,7 +2434,14 @@ function gambarLembar() {
   }
 
   // titik-titik: rencana biru + lencana konstruksi; eksisting hitam (hijau bila ada usulan/rehab)
-  const fasa = ((MATERIALS[s.penghantar] || {}).fasa) || 3;
+  // nomor lencana = urutan per jenis konstruksi (TM-1 pertama = 1, kedua = 2, dst. —
+  // tiap jenis dihitung terpisah), sesuai input saat taging
+  const urutanKonstruksi = new Map();
+  const hitungJenis = {};
+  rencana.forEach(p => {
+    hitungJenis[p.konstruksi] = (hitungJenis[p.konstruksi] || 0) + 1;
+    urutanKonstruksi.set(p.uid, hitungJenis[p.konstruksi]);
+  });
   state.poles.forEach(p => {
     if (p.mode === 'pelanggan') return; // calon pelanggan tidak masuk gambar rencana
     const eksisting = p.mode === 'eksisting';
@@ -2458,13 +2465,14 @@ function gambarLembar() {
         interactive: false,
       }).addTo(layerLembar);
     } else {
-      // lencana konstruksi: kode di atas, fasa | tinggi tiang di bawah
+      // lencana konstruksi: kode di atas, "urutan jenis | tinggi tiang" di bawah,
+      // ditaruh di bawah titik dengan jarak — tidak menutupi tikor
       L.marker([p.lat, p.lng], {
         icon: L.divIcon({
           className: '',
           html: `<div class="lg-badge"><div class="k">${p.konstruksi.replace('-', '')}</div>
-                 <div class="b">${konstruksiTR(p.konstruksi) ? 1 : fasa} | ${tinggiTiang(p.tiang)}</div></div>`,
-          iconSize: [48, 48], iconAnchor: [-6, 60],
+                 <div class="b">${urutanKonstruksi.get(p.uid) || 1} | ${tinggiTiang(p.tiang)}</div></div>`,
+          iconSize: [48, 48], iconAnchor: [24, -16],
         }),
         interactive: false,
       }).addTo(layerLembar);
