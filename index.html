@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=29">
+  <link rel="stylesheet" href="css/style.css?v=30">
 </head>
 <body>
 
@@ -328,14 +328,15 @@
         <div class="ls-baris"><small>DIPERIKSA OLEH :</small><b id="lg-t-diperiksa">—</b></div>
         <div class="ls-baris"><small>DISETUJUI OLEH :</small><b id="lg-t-disetujui">—</b></div>
         <div class="ls-baris"><small>TANGGAL :</small><b id="lg-t-tanggal">—</b></div>
+        <!-- baris legenda tampil dinamis — hanya yang datanya ada di gambar (diatur app.js) -->
         <div class="ls-baris ls-legenda"><small>KETERANGAN GAMBAR :</small>
-          <div><span class="lg-kotak" style="background:#2e7d32"></span> Kode Warna Rencana Rehab</div>
-          <div><span class="lg-kotak" style="background:#1e88e5"></span> Kode Warna Rencana Baru</div>
-          <div><span class="lg-kotak" style="background:#111"></span> Kode Warna Eksisting</div>
-          <div><span class="lg-garis" style="border-top-style:dashed"></span> SUTR</div>
-          <div><span class="lg-garis"></span> SUTM</div>
-          <div><svg width="11" height="17" viewBox="0 0 16 26" style="flex:0 0 auto"><path d="M2 12 h12 v-6 L8 1 L2 6 Z" fill="#111"/><rect x="6.8" y="12" width="2.4" height="12" fill="#111"/></svg> TRAFO CANTOL</div>
-          <div><svg width="17" height="17" viewBox="0 0 26 26" style="flex:0 0 auto"><path d="M3 13 h20 v-7 L13 1 L3 6 Z" fill="#111"/><rect x="6" y="13" width="2.4" height="11" fill="#111"/><rect x="17.6" y="13" width="2.4" height="11" fill="#111"/></svg> TRAFO PORTAL</div>
+          <div data-lg="rehab"><span class="lg-kotak" style="background:#2e7d32"></span> Kode Warna Rencana Rehab</div>
+          <div data-lg="rencana"><span class="lg-kotak" style="background:#1e88e5"></span> Kode Warna Rencana Baru</div>
+          <div data-lg="eksisting"><span class="lg-kotak" style="background:#111"></span> Kode Warna Eksisting</div>
+          <div data-lg="sutr"><span class="lg-garis" style="border-top-style:dashed"></span> SUTR</div>
+          <div data-lg="sutm"><span class="lg-garis"></span> SUTM</div>
+          <div data-lg="cantol"><svg width="11" height="17" viewBox="0 0 16 26" style="flex:0 0 auto"><path d="M2 12 h12 v-6 L8 1 L2 6 Z" fill="#111"/><rect x="6.8" y="12" width="2.4" height="12" fill="#111"/></svg> TRAFO CANTOL</div>
+          <div data-lg="portal"><svg width="17" height="17" viewBox="0 0 26 26" style="flex:0 0 auto"><path d="M3 13 h20 v-7 L13 1 L3 6 Z" fill="#111"/><rect x="6" y="13" width="2.4" height="11" fill="#111"/><rect x="17.6" y="13" width="2.4" height="11" fill="#111"/></svg> TRAFO PORTAL</div>
         </div>
         <div class="ls-baris"><small>NOMOR GAMBAR :</small><b id="lg-t-nomor" style="font-size:15px;text-align:center">—</b></div>
       </div>
@@ -345,9 +346,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=29"></script>
-  <script src="js/app.js?v=29"></script>
-  <script src="js/masuk.js?v=29"></script>
+  <script src="js/data.js?v=30"></script>
+  <script src="js/app.js?v=30"></script>
+  <script src="js/masuk.js?v=30"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

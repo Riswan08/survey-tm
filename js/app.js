@@ -2410,11 +2410,14 @@ function gambarLembar() {
 
   // rute rencana per gawang: SUTR (konstruksi JTR) putus-putus, SUTM utuh + label jarak
   const rencana = polesRencana();
+  let adaSUTR = false, adaSUTM = segmenEks.length > 0; // jaringan eksisting = SUTM
   for (let i = 1; i < rencana.length; i++) {
     const a = rencana[i - 1], b = rencana[i];
+    const segTR = konstruksiTR(a.konstruksi) || konstruksiTR(b.konstruksi);
+    if (segTR) adaSUTR = true; else adaSUTM = true;
     L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
       color: WARNA_LEMBAR.rencana, weight: 4,
-      dashArray: (konstruksiTR(a.konstruksi) || konstruksiTR(b.konstruksi)) ? '8 8' : null,
+      dashArray: segTR ? '8 8' : null,
     }).addTo(layerLembar);
     L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
       icon: L.divIcon({ className: 'lg-jarak', html: `${angka(haversine(a, b), 0)}`, iconSize: null }),
@@ -2477,6 +2480,21 @@ function gambarLembar() {
         interactive: false,
       }).addTo(layerLembar);
     }
+  });
+
+  // legenda dinamis: baris keterangan tampil hanya bila datanya ada di gambar
+  const eks = state.poles.filter(p => p.mode === 'eksisting');
+  const tampilLegenda = {
+    rehab: eks.some(p => (p.usulan || []).length),
+    rencana: rencana.length > 0,
+    eksisting: segmenEks.length > 0 || eks.some(p => !(p.usulan || []).length),
+    sutr: adaSUTR,
+    sutm: adaSUTM,
+    cantol: eks.some(p => p.jenisAset === 'TRAFO_CANTOL'),
+    portal: eks.some(p => p.jenisAset === 'TRAFO_PORTAL'),
+  };
+  document.querySelectorAll('#lembar [data-lg]').forEach(el => {
+    el.style.display = tampilLegenda[el.dataset.lg] ? '' : 'none';
   });
 }
 
