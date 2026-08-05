@@ -17,10 +17,12 @@
    internal. (Pengerasan lebih lanjut: reverse proxy + HTTPS.)
 
    API:
-     GET  /api/data   (header X-Kode-Unit) → { poles, diperbarui }
-     POST /api/sync   (header X-Kode-Unit, body {poles})
-          → gabung berdasarkan uid, pemenang = `diubah` terbaru
-          → { total, baru, diperbarui }
+     GET  /api/data   (header X-Kode-Unit)
+          → { poles, koreksi, tugas, harga, riwayatHarga, diperbarui }
+     POST /api/sync   (header X-Kode-Unit, body {poles, koreksi, tugas, harga})
+          → poles/koreksi/tugas digabung, pemenang = `diubah` terbaru
+          → harga (master terpusat) diganti bila stempelnya lebih baru
+          → { total, baru, diperbarui, tugas, harga }
    ============================================================ */
 
 const http = require('http');
@@ -66,6 +68,40 @@ function gabung(lama, masuk) {
     else if ((Number(p.diubah) || 0) > (Number(ada.diubah) || 0)) { peta.set(p.uid, p); diperbarui++; }
   });
   return { poles: [...peta.values()], baru, diperbarui };
+}
+
+// gabung penugasan survey (FR-16): per id tugas, `diubah` terbaru menang
+function gabungTugas(lama, masuk) {
+  const peta = new Map();
+  (lama || []).forEach(t => { if (t && typeof t.id === 'string') peta.set(t.id, t); });
+  (Array.isArray(masuk) ? masuk : []).forEach(t => {
+    if (!t || typeof t.id !== 'string' || t.id.length < 3 || t.id.length > 40) return;
+    if (typeof t.judul !== 'string' || !t.judul.trim()) return;
+    const ada = peta.get(t.id);
+    if (!ada || (Number(t.diubah) || 0) > (Number(ada.diubah) || 0)) peta.set(t.id, t);
+  });
+  return [...peta.values()];
+}
+
+// master harga terpusat (FR-15): satu paket override per unit,
+// diganti utuh bila stempel `diubah` pengirim lebih baru; riwayat dicatat.
+function gabungHarga(lama, masuk, riwayat) {
+  if (!masuk || typeof masuk !== 'object') return { harga: lama, riwayat, berubah: false };
+  const stempelBaru = Number(masuk.diubah) || 0;
+  const stempelLama = (lama && Number(lama.diubah)) || 0;
+  if (!stempelBaru || stempelBaru <= stempelLama) return { harga: lama, riwayat, berubah: false };
+  const bersih = {
+    hargaOverride: (masuk.hargaOverride && typeof masuk.hargaOverride === 'object') ? masuk.hargaOverride : {},
+    jasaOverride: (masuk.jasaOverride && typeof masuk.jasaOverride === 'object') ? masuk.jasaOverride : {},
+    diubah: stempelBaru,
+    oleh: typeof masuk.oleh === 'string' ? masuk.oleh.slice(0, 40) : '',
+  };
+  const log = (riwayat || []).concat([{
+    diubah: stempelBaru, oleh: bersih.oleh,
+    jumlahHarga: Object.keys(bersih.hargaOverride).length,
+    jumlahJasa: Object.keys(bersih.jasaOverride).length,
+  }]).slice(-50);
+  return { harga: bersih, riwayat: log, berubah: true };
 }
 
 // gabung koreksi sambungan antar tiang: per pasangan, `diubah` terbaru menang
@@ -126,7 +162,11 @@ http.createServer((req, res) => {
 
     if (req.method === 'GET' && url.startsWith('/api/data')) {
       const d = bacaUnit(kode);
-      kirimJSON(res, 200, { poles: d.poles, koreksi: d.koreksi || [], diperbarui: d.diperbarui });
+      kirimJSON(res, 200, {
+        poles: d.poles, koreksi: d.koreksi || [], tugas: d.tugas || [],
+        harga: d.harga || null, riwayatHarga: d.riwayatHarga || [],
+        diperbarui: d.diperbarui,
+      });
       return;
     }
 
@@ -142,9 +182,20 @@ http.createServer((req, res) => {
           const lama = bacaUnit(kode);
           const hasil = gabung(lama.poles, masuk.poles);
           const koreksi = gabungKoreksi(lama.koreksi, masuk.koreksi);
-          tulisUnit(kode, { poles: hasil.poles, koreksi, diperbarui: Date.now() });
-          console.log(`[sync] ${kode}: +${hasil.baru} baru, ${hasil.diperbarui} diperbarui, total ${hasil.poles.length}, koreksi ${koreksi.length}`);
-          kirimJSON(res, 200, { total: hasil.poles.length, baru: hasil.baru, diperbarui: hasil.diperbarui, koreksi: koreksi.length });
+          const tugas = gabungTugas(lama.tugas, masuk.tugas);
+          const h = gabungHarga(lama.harga, masuk.harga, lama.riwayatHarga);
+          tulisUnit(kode, {
+            poles: hasil.poles, koreksi, tugas,
+            harga: h.harga || null, riwayatHarga: h.riwayat || [],
+            diperbarui: Date.now(),
+          });
+          console.log(`[sync] ${kode}: +${hasil.baru} baru, ${hasil.diperbarui} diperbarui, total ${hasil.poles.length}, `
+            + `koreksi ${koreksi.length}, tugas ${tugas.length}${h.berubah ? ', harga terpusat diperbarui' : ''}`);
+          kirimJSON(res, 200, {
+            total: hasil.poles.length, baru: hasil.baru, diperbarui: hasil.diperbarui,
+            koreksi: koreksi.length, tugas: tugas.length,
+            harga: h.harga || null, hargaBerubah: h.berubah,
+          });
         } catch (e) {
           kirimJSON(res, 400, { error: 'JSON tidak valid' });
         }

@@ -5,6 +5,128 @@
 // ---------------- STATE ----------------
 const KUNCI_SIMPAN = 'survey_tm_v1';
 
+// ---------------- MULTI-PROYEK (FR-08) ----------------
+// Beberapa proyek (per penyulang/pekerjaan) dalam satu perangkat.
+// Registry di 'cakra_proyek'; data proyek 'utama' tetap di kunci lama
+// (survey_tm_v1) → data yang sudah ada otomatis menjadi Proyek Utama.
+const KUNCI_PROYEK = 'cakra_proyek';
+let proyek = { aktif: 'utama', daftar: [{ id: 'utama', nama: 'Proyek Utama', dibuat: 0 }] };
+
+function kunciSimpan(id) {
+  const p = id || proyek.aktif;
+  return p === 'utama' ? KUNCI_SIMPAN : KUNCI_SIMPAN + '_' + p;
+}
+
+function muatRegistryProyek() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KUNCI_PROYEK));
+    if (d && Array.isArray(d.daftar) && d.daftar.length) {
+      proyek.daftar = d.daftar
+        .filter(p => p && typeof p.id === 'string' && /^[a-z0-9]+$/i.test(p.id))
+        .map(p => ({
+          id: p.id.slice(0, 20),
+          nama: (typeof p.nama === 'string' && p.nama.trim()) ? p.nama.trim().slice(0, 60) : 'Proyek',
+          dibuat: Number(p.dibuat) || 0,
+        }));
+      if (!proyek.daftar.length) proyek.daftar = [{ id: 'utama', nama: 'Proyek Utama', dibuat: 0 }];
+      proyek.aktif = proyek.daftar.some(p => p.id === d.aktif) ? d.aktif : proyek.daftar[0].id;
+    }
+  } catch (e) { /* registry rusak → mulai dari bawaan */ }
+}
+
+function simpanRegistryProyek() {
+  localStorage.setItem(KUNCI_PROYEK, JSON.stringify(proyek));
+}
+
+const proyekAktif = () => proyek.daftar.find(p => p.id === proyek.aktif) || proyek.daftar[0];
+
+function gantiProyek(id) {
+  if (id === proyek.aktif || !proyek.daftar.some(p => p.id === id)) return;
+  simpan(); // amankan proyek yang sedang terbuka
+  proyek.aktif = id;
+  simpanRegistryProyek();
+  muat();
+  render();
+  if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
+  renderDaftarProyek();
+  toast(`📁 Proyek "${proyekAktif().nama}" dibuka — ${state.poles.length} titik`);
+}
+
+function buatProyek() {
+  const nama = (prompt('Nama proyek baru (mis. nama penyulang / pekerjaan):') || '').trim().slice(0, 60);
+  if (!nama) return;
+  const id = 'p' + Date.now().toString(36);
+  // proyek baru mewarisi pengaturan proyek aktif (petugas, server, harga) — titiknya kosong
+  const warisan = JSON.parse(JSON.stringify(state.settings));
+  warisan.namaPekerjaan = '';
+  simpan();
+  proyek.daftar.push({ id, nama, dibuat: Date.now() });
+  proyek.aktif = id;
+  simpanRegistryProyek();
+  localStorage.setItem(kunciSimpan(id), JSON.stringify({ poles: [], koreksi: [], settings: warisan, idBerikut: 1 }));
+  muat();
+  render();
+  renderDaftarProyek();
+  toast(`📁 Proyek "${nama}" dibuat & dibuka`);
+}
+
+function ubahNamaProyek(id) {
+  const p = proyek.daftar.find(x => x.id === id);
+  if (!p) return;
+  const nama = (prompt('Nama baru proyek:', p.nama) || '').trim().slice(0, 60);
+  if (!nama) return;
+  p.nama = nama;
+  simpanRegistryProyek();
+  renderDaftarProyek();
+}
+
+function hapusProyek(id) {
+  const p = proyek.daftar.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`Hapus proyek "${p.nama}" beserta seluruh titiknya dari perangkat ini?\n(Ekspor dulu ke JSON bila masih diperlukan.)`)) return;
+  localStorage.removeItem(kunciSimpan(id));
+  proyek.daftar = proyek.daftar.filter(x => x.id !== id);
+  if (!proyek.daftar.length) proyek.daftar = [{ id: 'utama', nama: 'Proyek Utama', dibuat: 0 }];
+  if (proyek.aktif === id) {
+    proyek.aktif = proyek.daftar[0].id;
+    simpanRegistryProyek();
+    muat();
+    render();
+    if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
+  } else {
+    simpanRegistryProyek();
+  }
+  renderDaftarProyek();
+  toast(`Proyek "${p.nama}" dihapus`);
+}
+
+function renderDaftarProyek() {
+  const wadah = $('#daftar-proyek');
+  if (!wadah) return;
+  wadah.innerHTML = '';
+  proyek.daftar.forEach(p => {
+    const aktif = p.id === proyek.aktif;
+    const div = document.createElement('div');
+    div.className = 'item-tiang';
+    div.innerHTML = `
+      <div class="bulat" style="background:${aktif ? '#0c6bb5' : '#90a4ae'}">📁</div>
+      <div class="isi">
+        <div class="nm">${p.nama} ${aktif ? '<span class="badge-skor" style="background:#2e7d32">AKTIF</span>' : ''}</div>
+        <div class="dt">${aktif ? `${state.poles.length} titik tersimpan` : (p.dibuat ? 'dibuat ' + new Date(p.dibuat).toLocaleDateString('id-ID') : 'proyek bawaan')}</div>
+      </div>
+      <div class="aksi">
+        ${aktif ? '' : '<button class="tombol utama kecil" data-a="buka">Buka</button>'}
+        <button class="tombol polos kecil" data-a="nama">✏️</button>
+        <button class="tombol bahaya kecil" data-a="hapus">🗑</button>
+      </div>`;
+    const btnBuka = div.querySelector('[data-a=buka]');
+    if (btnBuka) btnBuka.onclick = () => gantiProyek(p.id);
+    div.querySelector('[data-a=nama]').onclick = () => ubahNamaProyek(p.id);
+    div.querySelector('[data-a=hapus]').onclick = () => hapusProyek(p.id);
+    wadah.appendChild(div);
+  });
+}
+
 // identitas perangkat — untuk uid titik yang unik lintas surveyor (sinkronisasi M4)
 const DEVICE_ID = (() => {
   let d = localStorage.getItem('cakra_device_id');
@@ -61,7 +183,7 @@ function toast(pesan) {
 
 function simpan() {
   try {
-    localStorage.setItem(KUNCI_SIMPAN, JSON.stringify({ poles: state.poles, koreksi: state.koreksi, settings: state.settings, idBerikut }));
+    localStorage.setItem(kunciSimpan(), JSON.stringify({ poles: state.poles, koreksi: state.koreksi, settings: state.settings, idBerikut }));
   } catch (e) {
     toast('⚠️ Penyimpanan HP hampir penuh — hapus sebagian foto atau ekspor proyek ke JSON');
   }
@@ -186,12 +308,13 @@ function normalisasiState(d) {
       if (MATERIALS[kode] && isFinite(Number(h)) && Number(h) >= 0) hasil.settings.jasaOverride[kode] = Number(h);
     });
   }
+  if (isFinite(s.hargaDiubah) && s.hargaDiubah >= 0) hasil.settings.hargaDiubah = Number(s.hargaDiubah);
   return hasil;
 }
 
 function muat() {
   let d = null;
-  try { d = JSON.parse(localStorage.getItem(KUNCI_SIMPAN)); } catch (e) { /* data rusak → mulai kosong */ }
+  try { d = JSON.parse(localStorage.getItem(kunciSimpan())); } catch (e) { /* data rusak → mulai kosong */ }
   const bersih = normalisasiState(d);
   state.poles = bersih.poles;
   state.koreksi = bersih.koreksi;
@@ -1566,6 +1689,16 @@ function renderPengaturan() {
   $('#s-server').value = s.server || '';
   $('#s-unit').value = s.kodeUnit || '';
 
+  // identitas sesi (nama, ULP, peran) + keterangan hak harga
+  const sesi = (typeof sesiCakra === 'function') ? sesiCakra() : null;
+  const peranInfo = sesi ? (PERAN[sesi.peran] || PERAN.surveyor) : null;
+  $('#s-sesi-info').textContent = sesi
+    ? `Masuk sebagai ${sesi.petugas} — ${sesi.ulp} (${peranInfo.ikon} ${peranInfo.nama})`
+    : 'Belum masuk.';
+  $('#s-ket-harga').textContent = (typeof bolehKelolaHarga === 'function' && bolehKelolaHarga())
+    ? '🛠️ Anda admin: perubahan harga di sini menjadi master harga terpusat unit saat ⬆️ Kirim ke Server.'
+    : 'Harga dapat diubah untuk kebutuhan lokal; saat ⬇️ Ambil dari Server, harga akan disamakan dengan master harga terpusat unit (bila ada yang lebih baru).';
+
   // editor harga per kategori — material konstruksi punya dua kolom: material & jasa pasang
   const label = { tiang: 'Batang Tiang (harga contoh)', material: 'Material Konstruksi & Pendukung (lampiran UIW MMU)', penghantar: 'Penghantar (harga contoh)', jasa: 'Jasa Gelondongan (harga contoh)' };
   const wadah = $('#editor-harga');
@@ -1600,6 +1733,7 @@ function simpanPengaturan() {
   s.petugas = $('#s-petugas').value.trim().slice(0, 40);
   s.server = $('#s-server').value.trim().slice(0, 200);
   s.kodeUnit = $('#s-unit').value.trim().slice(0, 60);
+  const overrideSebelum = JSON.stringify([s.hargaOverride, s.jasaOverride]);
   document.querySelectorAll('#editor-harga input[data-kode]').forEach(inp => {
     const kode = inp.dataset.kode, nilai = Number(inp.value);
     if (inp.value === '' || !isFinite(nilai) || nilai < 0) return; // kosong / tidak valid → harga lama dipertahankan
@@ -1611,6 +1745,8 @@ function simpanPengaturan() {
       else delete s.hargaOverride[kode];
     }
   });
+  // harga berubah → stempel baru; admin akan menyebarkannya saat sinkronisasi (FR-15)
+  if (JSON.stringify([s.hargaOverride, s.jasaOverride]) !== overrideSebelum) s.hargaDiubah = Date.now();
   simpan(); render();
   tutupModal('modal-pengaturan');
   toast('Pengaturan & harga tersimpan');
@@ -1620,6 +1756,7 @@ function resetHarga() {
   if (!confirm('Kembalikan semua harga (material & jasa) ke nilai bawaan data.js?')) return;
   state.settings.hargaOverride = {};
   state.settings.jasaOverride = {};
+  state.settings.hargaDiubah = Date.now(); // reset juga tersebar sebagai paket harga terbaru
   simpan(); renderPengaturan(); render();
 }
 
@@ -1653,6 +1790,149 @@ function gabungKoreksi(masuk) {
   state.koreksi = [...peta.values()];
 }
 
+// ---------------- PENUGASAN SURVEY (FR-16) ----------------
+// Tugas berlaku untuk seluruh perangkat (bukan per proyek) — tersimpan
+// di kunci sendiri dan ikut mengalir lewat sinkronisasi server.
+const KUNCI_TUGAS = 'cakra_tugas';
+let daftarTugas = [];
+
+function normalisasiTugas(daftar) {
+  return (Array.isArray(daftar) ? daftar : [])
+    .filter(t => t && typeof t.id === 'string' && t.id.length >= 3 &&
+      typeof t.judul === 'string' && t.judul.trim())
+    .slice(0, 500)
+    .map(t => ({
+      id: t.id.slice(0, 40),
+      judul: t.judul.trim().slice(0, 80),
+      untuk: typeof t.untuk === 'string' ? t.untuk.trim().slice(0, 40) : '',
+      lokasi: typeof t.lokasi === 'string' ? t.lokasi.trim().slice(0, 80) : '',
+      lat: isFinite(t.lat) ? Number(t.lat) : null,
+      lng: isFinite(t.lng) ? Number(t.lng) : null,
+      catatan: typeof t.catatan === 'string' ? t.catatan.slice(0, 300) : '',
+      status: STATUS_TUGAS[t.status] ? t.status : 'baru',
+      oleh: typeof t.oleh === 'string' ? t.oleh.slice(0, 40) : '',
+      dibuat: Number(t.dibuat) || 0,
+      diubah: Number(t.diubah) || 0,
+    }));
+}
+
+function muatTugas() {
+  try { daftarTugas = normalisasiTugas(JSON.parse(localStorage.getItem(KUNCI_TUGAS))); }
+  catch (e) { daftarTugas = []; }
+}
+
+function simpanTugas() {
+  localStorage.setItem(KUNCI_TUGAS, JSON.stringify(daftarTugas));
+}
+
+function gabungTugas(masuk) {
+  const peta = new Map(daftarTugas.map(t => [t.id, t]));
+  let baru = 0;
+  normalisasiTugas(masuk).forEach(t => {
+    const ada = peta.get(t.id);
+    if (!ada) { peta.set(t.id, t); baru++; }
+    else if ((t.diubah || 0) > (ada.diubah || 0)) peta.set(t.id, t);
+  });
+  daftarTugas = [...peta.values()];
+  return baru;
+}
+
+// tugas terbuka untuk petugas ini ('untuk' kosong = semua surveyor)
+function tugasSaya() {
+  const nama = (state.settings.petugas || '').trim().toLowerCase();
+  return daftarTugas
+    .filter(t => t.status === 'baru' || t.status === 'dikerjakan')
+    .filter(t => !t.untuk || (nama && t.untuk.toLowerCase() === nama));
+}
+
+function perbaruiBadgeTugas() {
+  const b = $('#badge-tugas');
+  if (!b) return;
+  const n = tugasSaya().length;
+  b.textContent = n;
+  b.classList.toggle('sembunyi', !n);
+}
+
+function ubahStatusTugas(id, status) {
+  const t = daftarTugas.find(x => x.id === id);
+  if (!t || !STATUS_TUGAS[status]) return;
+  t.status = status;
+  t.diubah = Date.now();
+  simpanTugas(); renderTugas(); perbaruiBadgeTugas();
+  toast(`🗒️ "${t.judul}" → ${STATUS_TUGAS[status].nama} — kirim ke server agar kantor ikut melihat`);
+}
+
+function renderTugas() {
+  const wadah = $('#isi-tugas');
+  if (!daftarTugas.length) {
+    wadah.innerHTML = `<p class="catatan-kecil">Belum ada penugasan. Tugas dibuat perencana/manajer lewat Dasbor,
+      lalu muncul di sini setelah ⬇️ Ambil dari Server (menu ⚙️ Pengaturan).</p>`;
+    return;
+  }
+  wadah.innerHTML = '';
+  const urutan = { baru: 0, dikerjakan: 1, selesai: 2, dibatalkan: 3 };
+  const namaSaya = (state.settings.petugas || '').trim().toLowerCase();
+  [...daftarTugas]
+    .sort((a, b) => (urutan[a.status] - urutan[b.status]) || (b.dibuat - a.dibuat))
+    .forEach(t => {
+      const st = STATUS_TUGAS[t.status];
+      const untukSaya = !t.untuk || t.untuk.toLowerCase() === namaSaya;
+      const div = document.createElement('div');
+      div.className = 'item-tiang';
+      div.innerHTML = `
+        <div class="bulat" style="background:${st.warna}">${t.status === 'selesai' ? '✔' : t.status === 'dibatalkan' ? '✕' : '🗒'}</div>
+        <div class="isi">
+          <div class="nm">${t.judul} <span class="badge-skor" style="background:${st.warna}">${st.nama}</span></div>
+          <div class="dt">Untuk: <b>${t.untuk || 'semua surveyor'}</b>${untukSaya && t.untuk ? ' (Anda)' : ''}
+            ${t.lokasi ? ' · 📍 ' + t.lokasi : ''}${t.oleh ? ' · dari ' + t.oleh : ''}
+            ${t.catatan ? '<br>' + t.catatan : ''}</div>
+        </div>
+        <div class="aksi">
+          ${t.lat !== null && t.lng !== null ? '<button class="tombol polos kecil" data-a="peta">📍</button>' : ''}
+          ${t.status === 'baru' ? '<button class="tombol utama kecil" data-a="mulai">▶ Mulai</button>' : ''}
+          ${t.status === 'dikerjakan' ? '<button class="tombol utama kecil" data-a="selesai">✅ Selesai</button>' : ''}
+        </div>`;
+      const ke = (a, fn) => { const el = div.querySelector(`[data-a=${a}]`); if (el) el.onclick = fn; };
+      ke('peta', () => { tutupModal('modal-tugas'); map.setView([t.lat, t.lng], 17); toast(`📍 Lokasi tugas: ${t.judul}`); });
+      ke('mulai', () => ubahStatusTugas(t.id, 'dikerjakan'));
+      ke('selesai', () => ubahStatusTugas(t.id, 'selesai'));
+      wadah.appendChild(div);
+    });
+}
+
+// ---------------- MASTER HARGA TERPUSAT (FR-15) ----------------
+// Server menyimpan satu paket harga override per unit. Perangkat menerapkan
+// paket itu bila stempelnya lebih baru dari milik sendiri; admin yang
+// mengubah harga akan mengirim paket baru saat sinkronisasi.
+function terapkanHargaTerpusat(h) {
+  if (!h || typeof h !== 'object') return false;
+  const stempel = Number(h.diubah) || 0;
+  if (!stempel || stempel <= (state.settings.hargaDiubah || 0)) return false;
+  const saring = (obj) => {
+    const bersih = {};
+    Object.entries(obj || {}).forEach(([kode, v]) => {
+      if (MATERIALS[kode] && isFinite(Number(v)) && Number(v) >= 0) bersih[kode] = Number(v);
+    });
+    return bersih;
+  };
+  state.settings.hargaOverride = saring(h.hargaOverride);
+  state.settings.jasaOverride = saring(h.jasaOverride);
+  state.settings.hargaDiubah = stempel;
+  return true;
+}
+
+function paketHargaKirim() {
+  // hanya admin yang menyebarkan harga; tanpa stempel = belum pernah diubah
+  if (typeof bolehKelolaHarga !== 'function' || !bolehKelolaHarga()) return undefined;
+  if (!state.settings.hargaDiubah) return undefined;
+  return {
+    hargaOverride: state.settings.hargaOverride,
+    jasaOverride: state.settings.jasaOverride,
+    diubah: state.settings.hargaDiubah,
+    oleh: state.settings.petugas || '',
+  };
+}
+
 function urlServer() {
   return (state.settings.server || '').trim().replace(/\/+$/, '');
 }
@@ -1665,11 +1945,15 @@ async function kirimKeServer() {
     const res = await fetch(url + '/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': state.settings.kodeUnit },
-      body: JSON.stringify({ poles: state.poles, koreksi: state.koreksi }),
+      body: JSON.stringify({
+        poles: state.poles, koreksi: state.koreksi,
+        tugas: daftarTugas, harga: paketHargaKirim(),
+      }),
     });
     if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
     const d = await res.json();
-    toast(`✅ Terkirim — server kini menyimpan ${d.total} titik unit ini`);
+    toast(`✅ Terkirim — server kini menyimpan ${d.total} titik unit ini`
+      + (d.hargaBerubah ? ' · harga terpusat diperbarui' : ''));
   } catch (e) {
     toast('Gagal kirim: ' + (e.message || 'server tidak terjangkau'));
   }
@@ -1687,9 +1971,14 @@ async function ambilDariServer() {
     const d = await res.json();
     const hasil = gabungPoles(d.poles);
     gabungKoreksi(d.koreksi);
+    const tugasBaru = gabungTugas(d.tugas);
+    simpanTugas(); perbaruiBadgeTugas();
+    const hargaBaru = terapkanHargaTerpusat(d.harga);
     simpan(); render();
     if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
-    toast(`✅ Tergabung: ${hasil.baru} titik baru, ${hasil.diperbarui} diperbarui (total ${hasil.total})`);
+    toast(`✅ Tergabung: ${hasil.baru} titik baru, ${hasil.diperbarui} diperbarui (total ${hasil.total})`
+      + (tugasBaru ? ` · ${tugasBaru} tugas baru` : '')
+      + (hargaBaru ? ' · 💰 harga terpusat unit diterapkan' : ''));
   } catch (e) {
     toast('Gagal ambil: ' + (e.message || 'server tidak terjangkau'));
   }
@@ -1729,8 +2018,8 @@ function eksporCSV() {
   baris(`${rab.ph.nama} (${rab.ph.fasa} fasa x sag ${s.sagFactor})`, Math.round(rab.panjangKawat), 'm', hargaEfektif(s.penghantar), Math.round(rab.biayaPenghantar));
   baris('');
   baris('C. JASA');
-  baris(MATERIALS.JASA_TIANG.nama, state.poles.length, 'tiang', hargaEfektif('JASA_TIANG'), Math.round(rab.jasaTiang));
-  baris(MATERIALS.JASA_TARIK.nama, (rab.rute / 1000).toFixed(2), 'km', hargaEfektif('JASA_TARIK'), Math.round(rab.jasaTarik));
+  baris(MATERIALS.JASA_TIANG.nama, polesRencana().length, 'tiang', hargaEfektif('JASA_TIANG'), Math.round(rab.jasaTiang));
+  baris(MATERIALS.JASA_TARIK.nama, (rab.rutePenghantar / 1000).toFixed(2), 'km', hargaEfektif('JASA_TARIK'), Math.round(rab.jasaTarik));
   baris('');
   baris('Subtotal', '', '', '', Math.round(rab.subtotal));
   baris(`PPN ${s.ppnAktif ? s.ppnPersen + '%' : '0%'}`, '', '', '', Math.round(rab.ppn));
@@ -1855,6 +2144,126 @@ function imporJSON(file) {
   r.readAsText(file);
 }
 
+// ---------------- IMPOR KML / CSV (FR-10) ----------------
+// Titik aset yang sudah ada (hasil survey lama / GPS lain / Excel)
+// masuk sebagai aset eksisting atau lanjutan titik rencana.
+const BATAS_IMPOR = 5000;
+
+function titikDariKML(teks) {
+  const dok = new DOMParser().parseFromString(teks, 'text/xml');
+  if (dok.querySelector('parsererror')) throw new Error('bukan file KML yang valid');
+  const hasil = [];
+  dok.querySelectorAll('Placemark').forEach(pm => {
+    const koor = pm.querySelector('Point > coordinates');
+    if (!koor) return; // garis / poligon dilewati — hanya titik yang diimpor
+    const [lng, lat] = koor.textContent.trim().split(/[,\s]+/).map(Number);
+    if (!isFinite(lat) || !isFinite(lng)) return;
+    const ambil = (tag) => { const el = pm.querySelector(tag); return el ? el.textContent.trim() : ''; };
+    hasil.push({ nama: ambil('name').slice(0, 40), catatan: ambil('description').replace(/<[^>]*>/g, ' ').trim().slice(0, 300), lat, lng });
+  });
+  return hasil;
+}
+
+function titikDariCSV(teks) {
+  const barisSemua = teks.split(/\r?\n/).map(b => b.trim()).filter(Boolean);
+  if (!barisSemua.length) return [];
+  // pemisah = yang menghasilkan kolom terbanyak di baris pertama
+  const pemisah = [';', ',', '\t'].reduce((a, b) =>
+    (barisSemua[0].split(b).length > barisSemua[0].split(a).length ? b : a));
+  const potong = (b) => b.split(pemisah).map(k => k.trim().replace(/^"(.*)"$/, '$1'));
+
+  const kepala = potong(barisSemua[0]).map(k => k.toLowerCase());
+  const cariKolom = (kandidat) => kepala.findIndex(k => kandidat.some(c => k === c || k.startsWith(c)));
+  let iLat = cariKolom(['lat', 'latitude', 'lintang']);
+  let iLng = cariKolom(['lng', 'lon', 'long', 'bujur']);
+  let iNama = cariKolom(['nama', 'name', 'kode', 'label', 'titik', 'id']);
+  let iKet = cariKolom(['catatan', 'ket', 'desc', 'uraian']);
+  let mulai = 1;
+
+  if (iLat < 0 || iLng < 0) {
+    // tanpa baris kepala → deteksi dari isi: kolom angka |v|≤90 = lat, angka lain |v|≤180 = lng
+    const contoh = potong(barisSemua[0]);
+    const keAngka = (t) => parseFloat(String(t).replace(',', '.'));
+    iLat = contoh.findIndex(k => { const v = keAngka(k); return isFinite(v) && Math.abs(v) <= 90 && /[.,]/.test(k); });
+    iLng = contoh.findIndex((k, i) => { const v = keAngka(k); return i !== iLat && isFinite(v) && Math.abs(v) <= 180 && /[.,]/.test(k); });
+    iNama = contoh.findIndex(k => !isFinite(keAngka(k)));
+    iKet = -1;
+    mulai = 0;
+    if (iLat < 0 || iLng < 0) throw new Error('kolom koordinat tidak ditemukan — beri kepala kolom "lat" & "lng"');
+  }
+
+  const hasil = [];
+  for (let i = mulai; i < barisSemua.length; i++) {
+    const kolom = potong(barisSemua[i]);
+    const lat = parseFloat(String(kolom[iLat] || '').replace(',', '.'));
+    const lng = parseFloat(String(kolom[iLng] || '').replace(',', '.'));
+    if (!isFinite(lat) || !isFinite(lng)) continue;
+    hasil.push({
+      nama: (iNama >= 0 ? kolom[iNama] || '' : '').slice(0, 40),
+      catatan: (iKet >= 0 ? kolom[iKet] || '' : '').slice(0, 300),
+      lat, lng,
+    });
+  }
+  return hasil;
+}
+
+function imporTitikAset(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const teks = String(r.result || '');
+      const kml = /\.kml$/i.test(file.name) || teks.trimStart().startsWith('<');
+      let titik = kml ? titikDariKML(teks) : titikDariCSV(teks);
+      if (!titik.length) throw new Error('tidak ada titik koordinat yang bisa dibaca');
+      const dipangkas = titik.length > BATAS_IMPOR;
+      titik = titik.slice(0, BATAS_IMPOR);
+
+      const modeImpor = $('#e-impor-mode').value === 'rencana' ? 'rencana' : 'eksisting';
+      const uidAda = new Set(state.poles.map(p => p.uid));   // titik tersimpan → impor ulang dilewati
+      const uidSesi = new Set();                              // tikor kembar DI DALAM file ini → diberi nomor
+      let masuk = 0, lewat = 0;
+      titik.forEach(t => {
+        // uid deterministik dari tikor → impor ulang file yang sama tidak menggandakan titik
+        let uid = `imp-${t.lat.toFixed(5)}_${t.lng.toFixed(5)}`;
+        let n = 1;
+        while (uidSesi.has(uid) && n < 50) uid = `imp-${t.lat.toFixed(5)}_${t.lng.toFixed(5)}-${n++}`;
+        uidSesi.add(uid);
+        if (uidAda.has(uid)) { lewat++; return; }
+        const p = normalisasiPole({
+          id: idBerikut,
+          nama: t.nama || namaBerikut(modeImpor === 'eksisting' ? 'A' : 'T'),
+          lat: t.lat, lng: t.lng,
+          mode: modeImpor,
+          jenisAset: 'TIANG_TM',
+          kondisi: 'baik',
+          catatan: t.catatan,
+          uid,
+        }, state.poles.length);
+        if (!p) { lewat++; return; }
+        p.id = idBerikut++;
+        p.uid = uid;
+        p.petugas = state.settings.petugas || '';
+        p.diubah = Date.now();
+        state.poles.push(p);
+        uidAda.add(uid);
+        masuk++;
+      });
+      simpan(); render();
+      if (masuk) {
+        const barusan = state.poles.slice(-masuk);
+        map.fitBounds(barusan.map(p => [p.lat, p.lng]), { padding: [40, 40] });
+      }
+      tutupModal('modal-ekspor');
+      toast(`📥 ${masuk} titik diimpor sebagai ${modeImpor === 'eksisting' ? 'aset eksisting' : 'titik rencana'}`
+        + (lewat ? ` — ${lewat} dilewati (duplikat/rusak)` : '')
+        + (dipangkas ? ` — dibatasi ${BATAS_IMPOR} titik pertama` : ''));
+    } catch (e) {
+      toast('Impor gagal: ' + e.message);
+    }
+  };
+  r.readAsText(file);
+}
+
 function hapusSemua() {
   if (!confirm('Hapus SEMUA tiang & koreksi sambungan, lalu mulai proyek baru?')) return;
   state.poles = [];
@@ -1959,7 +2368,9 @@ function tutupModal(id) { $('#' + id).classList.remove('tampil'); }
 
 // ---------------- INIT ----------------
 document.addEventListener('DOMContentLoaded', () => {
+  muatRegistryProyek();
   muat();
+  muatTugas();
   initPeta();
 
   // pilihan jenis tiang diisi dari data.js — satu sumber data, tidak bisa desync
@@ -1987,6 +2398,8 @@ document.addEventListener('DOMContentLoaded', () => {
     toast(modeTaging ? 'Ketuk peta untuk menaruh tiang' : 'Mode taging dimatikan');
   };
   $('#btn-rab').onclick = renderRAB;
+  $('#btn-tugas').onclick = () => { renderTugas(); bukaModal('modal-tugas'); };
+  perbaruiBadgeTugas();
   $('#btn-cari').onclick = togglePanelCari;
   $('#cari-tombol').onclick = jalankanPencarian;
   $('#cari-tutup').onclick = togglePanelCari;
@@ -2008,7 +2421,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#ringkas').onclick = renderRAB;
   $('#btn-daftar').onclick = () => { renderDaftarTiang(); bukaModal('modal-daftar'); };
   $('#btn-pengaturan').onclick = renderPengaturan;
-  $('#btn-ekspor').onclick = () => bukaModal('modal-ekspor');
+  $('#btn-ekspor').onclick = () => { renderDaftarProyek(); bukaModal('modal-ekspor'); };
+  $('#p-baru').onclick = buatProyek;
+  $('#e-impor-kml').onchange = (e) => { if (e.target.files[0]) imporTitikAset(e.target.files[0]); e.target.value = ''; };
 
   // form titik
   $('#f-simpan').onclick = simpanTiangDariForm;

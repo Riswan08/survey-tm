@@ -9,7 +9,7 @@
      SW), jadi taging offline aman.
    ============================================================ */
 
-const VERSI = 'v22';
+const VERSI = 'v23';
 const CACHE_APP = 'stm-app-' + VERSI;
 const CACHE_TILE = 'stm-tiles-v1';
 const MAKS_TILE = 4000; // batas jumlah tile tersimpan
@@ -17,12 +17,12 @@ const MAKS_TILE = 4000; // batas jumlah tile tersimpan
 const ASET_APP = [
   './',
   './index.html',
-  './css/style.css?v=22',
-  './js/data.js?v=22',
-  './js/app.js?v=22',
+  './css/style.css?v=23',
+  './js/data.js?v=23',
+  './js/app.js?v=23',
   './dasbor.html',
-  './js/dasbor.js?v=22',
-  './js/masuk.js?v=22',
+  './js/dasbor.js?v=23',
+  './js/masuk.js?v=23',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/images/layers.png',
@@ -64,6 +64,10 @@ async function batasiTile() {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
+
+  // API sinkronisasi TIDAK PERNAH di-cache — data survey harus selalu segar
+  // (penting saat aplikasi dibuka langsung dari cakra-server: satu origin)
+  if (url.pathname.startsWith('/api/')) return;
 
   // Tile peta: cache-first, isi cache saat online
   if (HOST_TILE.some((h) => url.hostname.endsWith(h))) {

@@ -36,6 +36,21 @@ Ada dua cara — pilih salah satu:
    Selesai) → **⬆️ Simpan ke Server**.
 4. Surveyor menekan **⬇️ Ambil dari Server** untuk melihat status terbaru.
 
+## Penugasan survey & master harga (M5)
+
+- **Penugasan (FR-16):** perencana/manajer membuat tugas di Dasbor (judul, petugas,
+  lokasi, tikor opsional) → **⬆️ Simpan ke Server**. Surveyor menekan **⬇️ Ambil dari
+  Server** di aplikasi → tugas muncul di tombol 🗒️ (dengan lencana jumlah) → ubah
+  status **Mulai / Selesai** → kirim balik. Penggabungan per id tugas, stempel waktu
+  terbaru menang.
+- **Master harga terpusat (FR-15):** pengguna ber-peran **admin** mengubah harga di
+  aplikasi (⚙️ Pengaturan) lalu ⬆️ Kirim ke Server. Semua perangkat lain menerima harga
+  itu otomatis saat ⬇️ Ambil dari Server (paket harga dengan stempel terbaru menang).
+  Riwayat perubahan harga tampil di Dasbor.
+- **Peran (FR-12):** kode akses menentukan peran (surveyor / perencana / manajer /
+  admin) — daftar hash di `js/data.js` (`KODE_AKSES`). Membuat kode baru: konsol
+  browser → `await cakraHash('KODEBARU')` → tempel hash + `{ ulp, peran }`.
+
 ## Keamanan & data
 
 - **Kode Unit** adalah kunci akses data bersama — gunakan kode yang tidak mudah

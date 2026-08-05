@@ -8,6 +8,9 @@
 let poles = [];
 let koreksi = [];     // koreksi sambungan antar tiang (ikut tersinkron)
 let asetStatis = [];  // aset TM bawaan (data/aset-tm.json)
+let tugas = [];       // penugasan survey (FR-16) — ikut tersinkron
+let hargaTerpusat = null;  // master harga unit (FR-15) — info dari server
+let riwayatHarga = [];
 const KUNCI_CFG = 'cakra_dasbor_cfg';
 const kunciPasangan = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
 
@@ -95,6 +98,135 @@ function gabungKoreksi(masuk) {
     if (!ada || (k.diubah || 0) > (ada.diubah || 0)) peta.set(kunciPasangan(k.a, k.b), k);
   });
   koreksi = [...peta.values()];
+}
+
+// ---------------- penugasan survey (FR-16) ----------------
+function normalisasiTugas(daftar) {
+  return (Array.isArray(daftar) ? daftar : [])
+    .filter(t => t && typeof t.id === 'string' && t.id.length >= 3 &&
+      typeof t.judul === 'string' && t.judul.trim())
+    .slice(0, 500)
+    .map(t => ({
+      id: t.id.slice(0, 40),
+      judul: t.judul.trim().slice(0, 80),
+      untuk: typeof t.untuk === 'string' ? t.untuk.trim().slice(0, 40) : '',
+      lokasi: typeof t.lokasi === 'string' ? t.lokasi.trim().slice(0, 80) : '',
+      lat: isFinite(t.lat) ? Number(t.lat) : null,
+      lng: isFinite(t.lng) ? Number(t.lng) : null,
+      catatan: typeof t.catatan === 'string' ? t.catatan.slice(0, 300) : '',
+      status: STATUS_TUGAS[t.status] ? t.status : 'baru',
+      oleh: typeof t.oleh === 'string' ? t.oleh.slice(0, 40) : '',
+      dibuat: Number(t.dibuat) || 0,
+      diubah: Number(t.diubah) || 0,
+    }));
+}
+
+function gabungTugas(masuk) {
+  const peta = new Map(tugas.map(t => [t.id, t]));
+  let baru = 0;
+  normalisasiTugas(masuk).forEach(t => {
+    const ada = peta.get(t.id);
+    if (!ada) { peta.set(t.id, t); baru++; }
+    else if ((t.diubah || 0) > (ada.diubah || 0)) peta.set(t.id, t);
+  });
+  tugas = [...peta.values()];
+  return baru;
+}
+
+function tambahTugas() {
+  const judul = $('#t-judul').value.trim().slice(0, 80);
+  if (!judul) { toast('Isi judul tugas dulu (mis. "Survey kondisi penyulang Amahai")'); return; }
+  const tikor = parseTikor($('#t-tikor').value || '');
+  const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
+  tugas.push({
+    id: 'tg' + Date.now().toString(36) + Math.floor(Math.random() * 46656).toString(36),
+    judul,
+    untuk: $('#t-untuk').value.trim().slice(0, 40),
+    lokasi: $('#t-lokasi').value.trim().slice(0, 80),
+    lat: tikor ? tikor.lat : null,
+    lng: tikor ? tikor.lng : null,
+    catatan: $('#t-catatan').value.trim().slice(0, 300),
+    status: 'baru',
+    oleh: sesi.petugas || '',
+    dibuat: Date.now(),
+    diubah: Date.now(),
+  });
+  ['#t-judul', '#t-untuk', '#t-lokasi', '#t-tikor', '#t-catatan'].forEach(s => { $(s).value = ''; });
+  renderTugasDasbor();
+  toast('🗒️ Tugas dibuat — ⬆️ Simpan ke Server agar sampai ke surveyor');
+}
+
+function renderTugasDasbor() {
+  const bolehKelola = typeof bolehKelolaTugas === 'function' && bolehKelolaTugas();
+  $('#t-form').classList.toggle('sembunyi', !bolehKelola);
+  $('#t-ket-peran').classList.toggle('sembunyi', bolehKelola);
+
+  const wadah = $('#d-tabel-tugas');
+  if (!tugas.length) {
+    wadah.innerHTML = '<p class="catatan-kecil">Belum ada penugasan. Ambil dari server dulu, atau buat tugas baru di atas.</p>';
+    return;
+  }
+  const urutan = { baru: 0, dikerjakan: 1, selesai: 2, dibatalkan: 3 };
+  let html = `<table class="rab"><tr>
+    <th>Tugas</th><th>Untuk</th><th>Lokasi</th><th>Dibuat</th><th>Status</th></tr>`;
+  [...tugas].sort((a, b) => (urutan[a.status] - urutan[b.status]) || (b.dibuat - a.dibuat)).forEach(t => {
+    const st = STATUS_TUGAS[t.status];
+    const selStatus = bolehKelola
+      ? `<select data-tugas="${t.id}" style="border-left:4px solid ${st.warna}">${Object.entries(STATUS_TUGAS)
+          .map(([kode, s]) => `<option value="${kode}" ${t.status === kode ? 'selected' : ''}>${s.nama}</option>`).join('')}</select>`
+      : `<span class="badge-skor" style="background:${st.warna}">${st.nama}</span>`;
+    html += `<tr>
+      <td><b>${t.judul}</b>${t.catatan ? `<br><small>${t.catatan}</small>` : ''}</td>
+      <td>${t.untuk || 'semua surveyor'}</td>
+      <td>${t.lokasi || '—'}${t.lat !== null ? ` <button class="tombol polos kecil" data-peta="${t.id}">📍</button>` : ''}</td>
+      <td>${t.dibuat ? new Date(t.dibuat).toLocaleDateString('id-ID') : '—'}${t.oleh ? '<br><small>oleh ' + t.oleh + '</small>' : ''}</td>
+      <td>${selStatus}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  wadah.innerHTML = html;
+
+  wadah.querySelectorAll('select[data-tugas]').forEach(sel => {
+    sel.onchange = () => {
+      const t = tugas.find(x => x.id === sel.dataset.tugas);
+      if (!t) return;
+      t.status = sel.value;
+      t.diubah = Date.now();
+      renderTugasDasbor();
+      toast(`🗒️ "${t.judul}" → ${STATUS_TUGAS[sel.value].nama} — jangan lupa ⬆️ Simpan ke Server`);
+    };
+  });
+  wadah.querySelectorAll('[data-peta]').forEach(b => {
+    b.onclick = () => {
+      const t = tugas.find(x => x.id === b.dataset.peta);
+      if (!t || t.lat === null) return;
+      peta.setView([t.lat, t.lng], 16);
+      document.querySelector('#peta-dasbor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+  });
+}
+
+// ---------------- master harga terpusat (FR-15) — info & riwayat ----------------
+function renderHargaTerpusat() {
+  const wadah = $('#d-harga-info');
+  if (!hargaTerpusat) {
+    wadah.innerHTML = `<p class="catatan-kecil">Belum ada master harga terpusat unit ini. Admin: ubah harga di
+      aplikasi survey (⚙️ Pengaturan) lalu ⬆️ Kirim ke Server — semua perangkat mengikuti saat sinkronisasi.</p>`;
+    return;
+  }
+  const jmlH = Object.keys(hargaTerpusat.hargaOverride || {}).length;
+  const jmlJ = Object.keys(hargaTerpusat.jasaOverride || {}).length;
+  let html = `<p class="catatan-kecil">💰 Master harga aktif: <b>${jmlH} harga material</b> &amp; <b>${jmlJ} harga jasa</b> diubah dari bawaan
+    — terakhir diperbarui ${new Date(hargaTerpusat.diubah).toLocaleString('id-ID')}${hargaTerpusat.oleh ? ' oleh <b>' + hargaTerpusat.oleh + '</b>' : ''}.</p>`;
+  if (riwayatHarga.length) {
+    html += `<table class="rab"><tr><th>Waktu</th><th>Oleh</th><th class="angka">Harga Material Diubah</th><th class="angka">Harga Jasa Diubah</th></tr>`;
+    [...riwayatHarga].reverse().slice(0, 10).forEach(r => {
+      html += `<tr><td>${new Date(r.diubah).toLocaleString('id-ID')}</td><td>${r.oleh || '—'}</td>
+        <td class="angka">${r.jumlahHarga}</td><td class="angka">${r.jumlahJasa}</td></tr>`;
+    });
+    html += '</table>';
+  }
+  wadah.innerHTML = html;
 }
 
 async function muatAsetStatis() {
@@ -296,12 +428,18 @@ function renderTabelUsulan() {
     $('#d-tabel-usulan').innerHTML = '<p class="catatan-kecil">Tidak ada usulan pada filter ini.</p>';
     return;
   }
+  // surveyor hanya melihat status; ubah status = perencana/manajer/admin (FR-12)
+  const bolehUbah = typeof bolehKelolaUsulan === 'function' && bolehKelolaUsulan();
   let html = `<table class="rab"><tr>
     <th>Prioritas</th><th>Aset</th><th>Jenis</th><th>Kondisi</th><th>Paket Perbaikan</th>
     <th class="angka">Biaya</th><th>Petugas</th><th>Status</th></tr>`;
   daftar.forEach((u, i) => {
-    const opsi = Object.entries(STATUS_USULAN)
-      .map(([kode, st]) => `<option value="${kode}" ${u.entri.status === kode ? 'selected' : ''}>${st.nama}</option>`).join('');
+    const st = STATUS_USULAN[u.entri.status] || STATUS_USULAN.diusulkan;
+    const selStatus = bolehUbah
+      ? `<select data-uid="${u.pole.uid}" data-paket="${u.entri.paket}"
+          style="border-left:4px solid ${st.warna}">${Object.entries(STATUS_USULAN)
+            .map(([kode, s]) => `<option value="${kode}" ${u.entri.status === kode ? 'selected' : ''}>${s.nama}</option>`).join('')}</select>`
+      : `<span class="badge-skor" style="background:${st.warna}">${st.nama}</span>`;
     html += `<tr>
       <td><span class="badge-skor" style="background:${warnaSkor(u.skor)}">${u.skor}</span></td>
       <td>${u.pole.nama}</td>
@@ -310,11 +448,11 @@ function renderTabelUsulan() {
       <td>${(PAKET_PERBAIKAN[u.entri.paket] || {}).nama || u.entri.paket}</td>
       <td class="angka">${angka(u.total)}</td>
       <td>${u.pole.petugas || '—'}</td>
-      <td><select data-uid="${u.pole.uid}" data-paket="${u.entri.paket}"
-        style="border-left:4px solid ${(STATUS_USULAN[u.entri.status] || {}).warna}">${opsi}</select></td>
+      <td>${selStatus}</td>
     </tr>`;
   });
   html += '</table>';
+  if (!bolehUbah) html += '<p class="catatan-kecil">Masuk dengan kode perencana/manajer untuk mengubah status tindak lanjut.</p>';
   $('#d-tabel-usulan').innerHTML = html;
 
   document.querySelectorAll('#d-tabel-usulan select').forEach(sel => {
@@ -497,6 +635,8 @@ function renderSemua() {
   renderTitikUsulan();
   renderTabelUsulan();
   renderTabelPelanggan();
+  renderTugasDasbor();
+  renderHargaTerpusat();
 }
 
 // ---------------- sumber data ----------------
@@ -518,8 +658,12 @@ async function ambilServer() {
     const d = await res.json();
     const hasil = gabung(d.poles);
     gabungKoreksi(d.koreksi);
+    const tugasBaru = gabungTugas(d.tugas);
+    hargaTerpusat = d.harga || hargaTerpusat;
+    riwayatHarga = Array.isArray(d.riwayatHarga) ? d.riwayatHarga : riwayatHarga;
     renderSemua();
-    toast(`✅ ${hasil.baru} baru, ${hasil.diperbarui} diperbarui — total ${hasil.total} titik`);
+    toast(`✅ ${hasil.baru} baru, ${hasil.diperbarui} diperbarui — total ${hasil.total} titik`
+      + (tugasBaru ? ` · ${tugasBaru} tugas baru` : ''));
   } catch (e) { toast('Gagal: ' + e.message); }
 }
 
@@ -527,13 +671,13 @@ async function kirimServer() {
   simpanCfg();
   const url = $('#d-server').value.trim().replace(/\/+$/, ''), unit = $('#d-unit').value.trim();
   if (!url || !unit) { toast('Isi alamat server & kode unit'); return; }
-  if (!poles.length) { toast('Belum ada data untuk dikirim'); return; }
+  if (!poles.length && !tugas.length) { toast('Belum ada data untuk dikirim'); return; }
   toast('⬆️ Menyimpan ke server…');
   try {
     const res = await fetch(url + '/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': unit },
-      body: JSON.stringify({ poles, koreksi }),
+      body: JSON.stringify({ poles, koreksi, tugas }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
@@ -563,7 +707,7 @@ function imporFiles(files) {
 
 function unduhGabungan() {
   if (!poles.length) { toast('Belum ada data'); return; }
-  const blob = new Blob([JSON.stringify({ poles, koreksi }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ poles, koreksi, tugas }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'CAKRA-Gabungan.json';
@@ -593,9 +737,10 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#d-unduh').onclick = unduhGabungan;
   $('#d-bersih').onclick = () => {
     if (!poles.length || confirm('Kosongkan data dasbor? (data di server / file tidak terhapus)')) {
-      poles = []; koreksi = []; sudahFit = false; renderSemua();
+      poles = []; koreksi = []; tugas = []; sudahFit = false; renderSemua();
     }
   };
+  $('#t-tambah').onclick = tambahTugas;
 
   $('#d-cari-tombol').onclick = jalankanPencarian;
   $('#d-cari').addEventListener('keydown', (e) => { if (e.key === 'Enter') jalankanPencarian(); });

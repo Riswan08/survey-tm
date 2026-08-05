@@ -392,17 +392,44 @@ const KONDISI = {
 };
 
 // ------------------------------------------------------------
-// KODE AKSES APLIKASI per ULP (layar masuk)
+// PERAN PENGGUNA (FR-12) — menentukan hak di aplikasi & dasbor
+// surveyor : taging & survey lapangan (bawaan)
+// perencana: + ubah status usulan, kelola penugasan
+// manajer  : + ubah status usulan, kelola penugasan
+// admin    : + kelola master harga terpusat unit
+// ------------------------------------------------------------
+const PERAN = {
+  surveyor:  { nama: 'Surveyor',  ikon: '🚶' },
+  perencana: { nama: 'Perencana', ikon: '📐' },
+  manajer:   { nama: 'Manajer',   ikon: '🧑‍💼' },
+  admin:     { nama: 'Admin',     ikon: '🛠️' },
+};
+
+// status penugasan survey (FR-16)
+const STATUS_TUGAS = {
+  baru:       { nama: 'Baru',       warna: '#607d8b' },
+  dikerjakan: { nama: 'Dikerjakan', warna: '#f57c00' },
+  selesai:    { nama: 'Selesai',    warna: '#2e7d32' },
+  dibatalkan: { nama: 'Dibatalkan', warna: '#9e9e9e' },
+};
+
+// ------------------------------------------------------------
+// KODE AKSES APLIKASI (layar masuk) — per ULP + PERAN
 // Yang disimpan hanya HASH SHA-256-nya — kode aslinya tidak terbaca di sini.
-// Kode yang dipakai menentukan ULP pengguna (tercatat di sesi).
+// Kode yang dipakai menentukan ULP & peran pengguna (tercatat di sesi).
 // Ganti/tambah kode: konsol browser → await cakraHash('KODEBARU') → tempel ke sini.
 // ------------------------------------------------------------
 const KODE_AKSES = {
-  '02bafe81c5cbd71611dd1b2178a2410e2d003f727015035c3e9003468863944a': 'ULP Piru',
-  '7ae0865f53528ddf750b5728e3570e0713cb235a782ec1387e422cbf9d7e38a7': 'ULP Masohi',
-  '5b7a436e2ca4a8c8135f4f6513b23f5dce679b23277ec5dd58083b4323167d12': 'ULP Kairatu',
-  '7fbe9da3f554d892d8d487d0c0b0e38362bdf9d8b2a4a6619c0be8b2540cf776': 'ULP Kobisonta',
-  '769e88a66014f9d0f61f37d013a2a177bcdd77f5e95a05ea394efe27624e9abc': 'ULP Bula',
+  // --- kode surveyor per ULP ---
+  '02bafe81c5cbd71611dd1b2178a2410e2d003f727015035c3e9003468863944a': { ulp: 'ULP Piru',      peran: 'surveyor' },
+  '7ae0865f53528ddf750b5728e3570e0713cb235a782ec1387e422cbf9d7e38a7': { ulp: 'ULP Masohi',    peran: 'surveyor' },
+  '5b7a436e2ca4a8c8135f4f6513b23f5dce679b23277ec5dd58083b4323167d12': { ulp: 'ULP Kairatu',   peran: 'surveyor' },
+  '7fbe9da3f554d892d8d487d0c0b0e38362bdf9d8b2a4a6619c0be8b2540cf776': { ulp: 'ULP Kobisonta', peran: 'surveyor' },
+  '769e88a66014f9d0f61f37d013a2a177bcdd77f5e95a05ea394efe27624e9abc': { ulp: 'ULP Bula',      peran: 'surveyor' },
+  // --- kode peran kantor UP3 (ganti dengan kode sendiri bila perlu) ---
+  '71d81061b23ef42e6096bbe4a9ce6e86f06bb3cd2d1e23a9404328efe878f15e': { ulp: 'UP3 Masohi', peran: 'admin' },
+  '51e246a52d50a583ce37ec988ee47410d69ce4eee6b7be5577570269b409ccbd': { ulp: 'UP3 Masohi', peran: 'perencana' },
+  'cfa63637cadf1d4366d4742b914a08b4047643d2a97a890c4cec1ca87f46882b': { ulp: 'UP3 Masohi', peran: 'manajer' },
 };
 
 // ------------------------------------------------------------
@@ -415,6 +442,7 @@ const DEFAULT_SETTINGS = {
   ppnPersen: 11,
   hargaOverride: {},        // { kode: hargaMaterial custom } — dari menu Pengaturan
   jasaOverride: {},         // { kode: hargaJasa custom }
+  hargaDiubah: 0,           // stempel waktu paket harga — dipakai master harga terpusat (FR-15)
   akurasiMin: 15,           // meter — di atas ini muncul konfirmasi sebelum tikor dipakai
   jenisPekerjaan: 'PERLUASAN_JTM',  // identitas pekerjaan survey ini
   namaPekerjaan: '',                // mis. "Perluasan Dusun Waraka"

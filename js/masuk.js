@@ -23,6 +23,17 @@ function sesiSaatIni() {
   } catch (e) { /* rusak → anggap belum masuk */ }
   return null;
 }
+window.sesiCakra = sesiSaatIni;
+
+// ---- peran & hak akses (FR-12) — sesi lama tanpa peran = surveyor ----
+function peranSesi() {
+  const s = sesiSaatIni();
+  return (s && PERAN[s.peran]) ? s.peran : 'surveyor';
+}
+const bolehKelolaUsulan = () => ['perencana', 'manajer', 'admin'].includes(peranSesi());
+const bolehKelolaTugas  = () => ['perencana', 'manajer', 'admin'].includes(peranSesi());
+const bolehKelolaHarga  = () => peranSesi() === 'admin';
+window.peranSesi = peranSesi;
 
 function keluarSesi() {
   localStorage.removeItem(SESI_KUNCI);
@@ -52,21 +63,32 @@ function tampilkanLayarMasuk() {
     const galat = layar.querySelector('#m-galat');
     if (!petugas) { galat.textContent = 'Isi nama petugas dulu.'; galat.classList.remove('sembunyi'); return; }
     if (!kode) { galat.textContent = 'Isi kode akses.'; galat.classList.remove('sembunyi'); return; }
-    const ulp = KODE_AKSES[await cakraHash(kode)];
-    if (!ulp) {
+    const cocok = KODE_AKSES[await cakraHash(kode)];
+    if (!cocok) {
       galat.textContent = 'Kode akses salah — hubungi admin unit.';
       galat.classList.remove('sembunyi');
       layar.querySelector('#m-kode').value = '';
       return;
     }
-    localStorage.setItem(SESI_KUNCI, JSON.stringify({ petugas: petugas.slice(0, 40), ulp, masuk: Date.now() }));
+    // nilai lama berupa string ULP saja → peran surveyor
+    const akun = typeof cocok === 'string' ? { ulp: cocok, peran: 'surveyor' } : cocok;
+    localStorage.setItem(SESI_KUNCI, JSON.stringify({
+      petugas: petugas.slice(0, 40), ulp: akun.ulp,
+      peran: PERAN[akun.peran] ? akun.peran : 'surveyor',
+      masuk: Date.now(),
+    }));
     // nama petugas login otomatis menstempel titik survey (jika halaman aplikasi)
     if (typeof state !== 'undefined' && state.settings && !state.settings.petugas) {
       state.settings.petugas = petugas.slice(0, 40);
       if (typeof simpan === 'function') simpan();
     }
     layar.remove();
-    if (typeof toast === 'function') toast(`Selamat datang, ${petugas.slice(0, 40)} — ${ulp}`);
+    if (typeof toast === 'function') {
+      const p = PERAN[akun.peran] || PERAN.surveyor;
+      toast(`Selamat datang, ${petugas.slice(0, 40)} — ${akun.ulp} (${p.ikon} ${p.nama})`);
+    }
+    // hak peran memengaruhi tampilan dasbor/pengaturan → segarkan bila fungsinya ada
+    if (typeof renderSemua === 'function') renderSemua();
   };
   layar.querySelector('#m-masuk').onclick = proses;
   layar.querySelectorAll('input').forEach(i =>

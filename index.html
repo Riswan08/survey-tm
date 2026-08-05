@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=22">
+  <link rel="stylesheet" href="css/style.css?v=23">
 </head>
 <body>
 
@@ -20,6 +20,8 @@
     <div class="spacer"></div>
     <button class="tombol-bar" id="btn-cari" title="Cari desa / lokasi / tikor">🔍</button>
     <button class="tombol-bar" id="btn-daftar">📋 Tiang</button>
+    <button class="tombol-bar" id="btn-tugas" title="Penugasan survey untuk Anda" style="position:relative">🗒️
+      <span id="badge-tugas" class="badge-skor sembunyi" style="background:#e53935;position:absolute;top:-5px;right:-5px">0</span></button>
     <button class="tombol-bar" id="btn-rab">💰 RAB</button>
     <a class="tombol-bar" id="btn-dasbor" href="dasbor.html" title="Dasbor manajemen" style="text-decoration:none">📊</a>
     <button class="tombol-bar" id="btn-pengaturan">⚙️</button>
@@ -69,12 +71,7 @@
       <div class="modal-isi">
         <div class="form-baris">
           <div class="form-grup"><label>Jenis Tiang</label>
-            <select id="q-tiang">
-              <option value="TIANG_12_200">Beton 12 m / 200 daN</option>
-              <option value="TIANG_12_350">Beton 12 m / 350 daN</option>
-              <option value="TIANG_13_350">Beton 13 m / 350 daN</option>
-              <option value="TIANG_14_500">Beton 14 m / 500 daN</option>
-            </select>
+            <select id="q-tiang"></select><!-- opsi diisi dari data.js — satu sumber data -->
           </div>
         </div>
         <div class="form-grup"><label>Aksesoris Tambahan</label><div id="q-aksesoris"></div></div>
@@ -180,6 +177,22 @@
     </div>
   </div>
 
+  <!-- ===== MODAL: PENUGASAN SURVEY ===== -->
+  <div class="modal-latar" id="modal-tugas">
+    <div class="modal">
+      <div class="modal-kepala">🗒️ Penugasan Survey
+        <button class="tutup" data-tutup="modal-tugas">×</button></div>
+      <div class="modal-isi">
+        <p class="catatan-kecil" style="margin-bottom:10px">Tugas dibuat perencana/manajer di Dasbor dan tiba lewat
+          ⬇️ Ambil dari Server. Setelah mengubah status, ⬆️ Kirim ke Server agar kantor melihat kemajuannya.</p>
+        <div id="isi-tugas"></div>
+      </div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-tugas">Tutup</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MODAL: PENGATURAN ===== -->
   <div class="modal-latar" id="modal-pengaturan">
     <div class="modal">
@@ -218,8 +231,10 @@
         Tanpa server pun data antar surveyor tetap bisa digabung lewat Dasbor (impor beberapa file JSON).</p>
 
         <div class="judul-seksi">Harga Satuan (bisa diubah, tersimpan di perangkat)</div>
+        <p class="catatan-kecil" id="s-ket-harga" style="margin-bottom:8px"></p>
         <div id="editor-harga"></div>
         <div class="judul-seksi">Sesi</div>
+        <p class="catatan-kecil" id="s-sesi-info" style="margin-bottom:8px"></p>
         <button class="tombol bahaya" id="s-keluar" style="width:100%">🚪 Keluar / Ganti Petugas</button>
       </div>
       <div class="modal-kaki">
@@ -248,12 +263,28 @@
         <div class="judul-seksi">Peta Offline</div>
         <p class="catatan-kecil" style="margin-bottom:10px">Sebelum ke lokasi tanpa sinyal: buka area kerja di peta, lalu unduh. Tile peta tersimpan di HP dan tampil saat offline. GPS &amp; taging selalu berfungsi walau peta belum diunduh.</p>
         <button class="tombol utama" id="e-tile" style="width:100%">🗺 Unduh Peta Area Ini untuk Offline</button>
-        <div class="judul-seksi">Simpan / Buka Proyek</div>
+        <div class="judul-seksi">Proyek di Perangkat (per penyulang / pekerjaan)</div>
+        <div id="daftar-proyek"></div>
+        <button class="tombol utama" id="p-baru" style="width:100%;margin-bottom:4px">➕ Proyek Baru</button>
+        <p class="catatan-kecil" style="margin-bottom:10px">Tiap proyek punya titik, koreksi, &amp; pengaturan sendiri. Taging, RAB, dan sinkronisasi selalu bekerja pada proyek yang AKTIF.</p>
+        <div class="judul-seksi">Impor Titik Aset (KML / CSV)</div>
+        <div class="form-baris">
+          <div class="form-grup"><label>Impor sebagai</label>
+            <select id="e-impor-mode">
+              <option value="eksisting">📋 Aset eksisting (inventaris)</option>
+              <option value="rencana">🆕 Titik rencana (lanjutan rute)</option>
+            </select></div>
+          <div class="form-grup"><label>&nbsp;</label>
+            <label class="tombol polos" style="display:block;text-align:center;cursor:pointer">📥 Pilih File KML / CSV
+              <input type="file" id="e-impor-kml" accept=".kml,.csv,.txt" hidden></label></div>
+        </div>
+        <p class="catatan-kecil" style="margin-bottom:10px">KML: semua Placemark bertitik. CSV: kolom lat/latitude &amp; lng/lon/longitude (pemisah <code>;</code> atau <code>,</code>), kolom nama opsional.</p>
+        <div class="judul-seksi">Simpan / Buka Proyek (file)</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="tombol polos" id="e-json">💾 Simpan Proyek (file JSON)</button>
           <label class="tombol polos" style="text-align:center">📂 Buka Proyek (JSON)
             <input type="file" id="e-impor" accept=".json" hidden></label>
-          <button class="tombol bahaya" id="e-hapus">🗑 Hapus Semua / Proyek Baru</button>
+          <button class="tombol bahaya" id="e-hapus">🗑 Kosongkan Proyek Aktif</button>
         </div>
       </div>
       <div class="modal-kaki">
@@ -265,9 +296,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=22"></script>
-  <script src="js/app.js?v=22"></script>
-  <script src="js/masuk.js?v=22"></script>
+  <script src="js/data.js?v=23"></script>
+  <script src="js/app.js?v=23"></script>
+  <script src="js/masuk.js?v=23"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

@@ -122,26 +122,26 @@ Prioritas: **P0** = wajib fase tersebut, **P1** = penting, **P2** = nice-to-have
 ### Fase 2 (berikutnya)
 | ID | Kebutuhan | Prioritas |
 |---|---|---|
-| FR-01 | Mode survey "Aset Eksisting" di samping mode "Rencana Baru" | P0 |
-| FR-02 | Tipe aset: tiang, gardu, seksi penghantar, pengaman (arrester/FCO), grounding, ROW | P0 |
-| FR-03 | Form kondisi per tipe aset (checklist + tingkat kerusakan + catatan) | P0 |
-| FR-04 | Foto aset dari kamera HP, tersimpan offline, ikut ekspor | P0 |
-| FR-05 | Katalog "paket perbaikan" per jenis kerusakan → BOM & RAB otomatis | P0 |
-| FR-06 | Skor prioritas usulan (kerusakan × dampak) yang bisa diatur bobotnya | P1 |
-| FR-07 | Ekspor Daftar Usulan Perbaikan + RAB per penyulang (CSV/Excel) | P0 |
-| FR-08 | Multi-proyek dalam satu perangkat (per penyulang/pekerjaan) | P1 |
-| FR-09 | Pencarian & filter aset di peta (jenis, kondisi, prioritas) | P1 |
-| FR-10 | Impor titik aset dari KML/CSV (data eksisting yang sudah ada) | P2 |
+| FR-01 | Mode survey "Aset Eksisting" di samping mode "Rencana Baru" | P0 ✅ |
+| FR-02 | Tipe aset: tiang, gardu, seksi penghantar, pengaman (arrester/FCO), grounding, ROW | P0 ✅ |
+| FR-03 | Form kondisi per tipe aset (checklist + tingkat kerusakan + catatan) | P0 ✅ |
+| FR-04 | Foto aset dari kamera HP, tersimpan offline, ikut ekspor | P0 ✅ |
+| FR-05 | Katalog "paket perbaikan" per jenis kerusakan → BOM & RAB otomatis | P0 ✅ |
+| FR-06 | Skor prioritas usulan (kerusakan × dampak) yang bisa diatur bobotnya | P1 ✅ |
+| FR-07 | Ekspor Daftar Usulan Perbaikan + RAB per penyulang (CSV/Excel) | P0 ✅ |
+| FR-08 | Multi-proyek dalam satu perangkat (per penyulang/pekerjaan) | P1 ✅ M5 |
+| FR-09 | Pencarian & filter aset di peta (jenis, kondisi, prioritas) | P1 (pencarian ✅; filter jenis/kondisi menyusul) |
+| FR-10 | Impor titik aset dari KML/CSV (data eksisting yang sudah ada) | P2 ✅ M5 |
 
 ### Fase 3
 | ID | Kebutuhan | Prioritas |
 |---|---|---|
-| FR-11 | Sinkronisasi data ke server saat online (offline-first, anti duplikat) | P0 |
-| FR-12 | Autentikasi & peran pengguna | P0 |
-| FR-13 | Dasbor web: peta kondisi, rekap usulan, nilai anggaran per unit | P0 |
-| FR-14 | Alur status usulan (diusulkan → disetujui → dikerjakan → selesai) | P1 |
-| FR-15 | Master harga terpusat + riwayat perubahan harga | P1 |
-| FR-16 | Notifikasi/penugasan survey ke surveyor tertentu | P2 |
+| FR-11 | Sinkronisasi data ke server saat online (offline-first, anti duplikat) | P0 ✅ |
+| FR-12 | Autentikasi & peran pengguna (surveyor/perencana/manajer/admin via kode akses) | P0 ✅ M5 |
+| FR-13 | Dasbor web: peta kondisi, rekap usulan, nilai anggaran per unit | P0 ✅ |
+| FR-14 | Alur status usulan (diusulkan → disetujui → dikerjakan → selesai) | P1 ✅ |
+| FR-15 | Master harga terpusat + riwayat perubahan harga | P1 ✅ M5 |
+| FR-16 | Penugasan survey ke surveyor tertentu (dibuat di dasbor, tiba saat sinkron) | P2 ✅ M5 |
 
 ## 8. Kebutuhan Non-Fungsional
 
@@ -215,7 +215,8 @@ prioritas tinggi → menyetujui paket → status terpantau sampai selesai.
 | **M1 — Survey TM & RAB** | Fase 1 lengkap, harga lampiran UIW MMU, PWA offline, live di GitHub Pages | ✅ Selesai (Juli 2026) |
 | **M2 — Rebranding CAKRA** | Nama, logo, ikon aplikasi CAKRA; mode Rencana vs Eksisting | ✅ Selesai (Juli 2026) |
 | **M3 — Kondisi & Usulan** | FR-01…FR-07 (aset eksisting, kondisi, foto, paket perbaikan, prioritas) | ✅ Selesai (Juli 2026) |
-| **M4 — Data Terpusat** | Server sinkronisasi (`server/`), dasbor manajemen (`dasbor.html`), status tindak lanjut usulan | ✅ Selesai (Juli 2026) — akun/peran & penugasan menyusul |
+| **M4 — Data Terpusat** | Server sinkronisasi (`server/`), dasbor manajemen (`dasbor.html`), status tindak lanjut usulan | ✅ Selesai (Juli 2026) |
+| **M5 — Peran, Penugasan & Multi-Proyek** | Peran pengguna di kode akses (FR-12), penugasan survey (FR-16), master harga terpusat + riwayat (FR-15), multi-proyek per perangkat (FR-08), impor KML/CSV (FR-10) | ✅ Selesai (Agustus 2026) |
 
 ## 14. Di Luar Lingkup (Non-Goals)
 
