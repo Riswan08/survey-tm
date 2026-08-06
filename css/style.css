@@ -525,3 +525,18 @@ td.angka, th.angka { text-align: right; white-space: nowrap; }
   /* kontrol zoom & atribusi peta tidak ikut tercetak */
   #lembar .leaflet-control-zoom { display: none !important; }
 }
+
+/* ===== tampilan HP: lembar cetak & toolbar ===== */
+/* lembar tetap 1122px (ukuran cetak A4) — di layar sempit diskalakan
+   otomatis lewat properti zoom (diatur app.js) agar terlihat utuh */
+@media (max-width: 720px) {
+  #lembar-wrap, #rab-wrap { padding: 6px; }
+  .lembar-alat { padding: 8px 10px; border-radius: 8px; }
+  .lembar-isian { gap: 5px; margin-bottom: 6px; }
+  .lembar-isian input { flex: 1 1 45%; min-width: 0; font-size: 12px; padding: 7px 8px; }
+  .lembar-alat .tombol { flex: 1; padding: 10px 8px; }
+}
+@media print {
+  /* skala layar HP tidak boleh terbawa ke kertas */
+  .lembar, .rab-lembar { zoom: 1 !important; }
+}

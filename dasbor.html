@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=35">
+  <link rel="stylesheet" href="css/style.css?v=36">
   <style>
     /* tata letak khusus dasbor: halaman menggulir, peta di panel */
     body { overflow: auto; background: var(--abu); }
@@ -34,6 +34,22 @@
     #lightbox.tampil { display: flex; }
     #lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 10px; }
     #lightbox .ket { color: #fff; font-size: 14px; font-weight: 600; }
+    /* ---- tampilan HP ---- */
+    @media (max-width: 600px) {
+      #isi-dasbor { padding: 60px 6px 24px; }
+      .panel { padding: 10px 11px; border-radius: 10px; margin-bottom: 10px; }
+      .judul-seksi { font-size: 13px; }
+      .kartu-baris { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+      .kartu-stat { padding: 8px 10px; }
+      .kartu-stat .nilai { font-size: 15px; }
+      .kartu-stat .ket { font-size: 10px; }
+      #peta-dasbor { height: 300px; }
+      .baris-alat input[type=text] { flex: 1 1 100%; }
+      .baris-alat .tombol { flex: 1 1 auto; padding: 10px 8px; font-size: 12px; }
+      table.rab { font-size: 10.5px; }
+      table.rab th, table.rab td { padding: 4px 5px; }
+      .foto-mini { width: 52px; height: 52px; }
+    }
   </style>
 </head>
 <body>
@@ -114,8 +130,8 @@
   <div id="lightbox"><img alt="eviden"><div class="ket"></div></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=35"></script>
-  <script src="js/dasbor.js?v=35"></script>
-  <script src="js/masuk.js?v=35"></script>
+  <script src="js/data.js?v=36"></script>
+  <script src="js/dasbor.js?v=36"></script>
+  <script src="js/masuk.js?v=36"></script>
 </body>
 </html>

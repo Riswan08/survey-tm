@@ -2411,6 +2411,18 @@ function tinggiTiang(kode) {
 
 function konstruksiTR(kode) { return (KONSTRUKSI[kode] || {}).grup === 'JTR'; }
 
+// skala lembar cetak agar muat layar HP: lembar tetap 1122px (ukuran A4),
+// di layar sempit diperkecil dengan properti zoom — hasil cetak tidak berubah
+// (dipulihkan ke 1 lewat CSS @media print)
+function pasSkalaLembar() {
+  const skala = Math.min(1, (window.innerWidth - 16) / 1122);
+  ['#lembar', '#rab-lembar'].forEach(sel => {
+    const el = $(sel);
+    if (el) el.style.zoom = skala < 1 ? String(skala) : '';
+  });
+  return skala;
+}
+
 // arah layar (x ke kanan, y ke bawah) dari titik a menuju b — untuk menaruh
 // lencana/label tegak lurus rute agar tidak menutupi titik taging
 function arahLayar(a, b) {
@@ -2582,6 +2594,7 @@ function bukaLembarGambar() {
     layerLembar = L.layerGroup().addTo(petaLembar);
   }
   gambarLembar();
+  pasSkalaLembar();
   setTimeout(() => {
     petaLembar.invalidateSize();
     petaLembar.fitBounds(titikGambar.map(p => [p.lat, p.lng]), { padding: [70, 70] });
@@ -2718,6 +2731,7 @@ function bukaRABResmi() {
   isi('#rb-nama2', s.petugas || '');
   isi('#rb-jab3', 'Manager UP3 Masohi');
   renderRABResmi();
+  pasSkalaLembar();
   $('#rab-wrap').classList.remove('sembunyi');
 }
 
@@ -2821,6 +2835,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#rb-tutup').onclick = () => $('#rab-wrap').classList.add('sembunyi');
   ['#rb-pekerjaan', '#rb-lokasi', '#rb-kota', '#rb-jab1', '#rb-nama1', '#rb-jab2', '#rb-nama2', '#rb-jab3', '#rb-nama3']
     .forEach(sel => { $(sel).oninput = renderRABResmi; });
+  // lembar cetak ikut menyesuaikan saat layar berubah (putar HP / ubah ukuran jendela)
+  window.addEventListener('resize', () => {
+    pasSkalaLembar();
+    if (petaLembar && !$('#lembar-wrap').classList.contains('sembunyi')) petaLembar.invalidateSize();
+  });
   ['#lg-judul', '#lg-lokasi', '#lg-digambar', '#lg-diperiksa', '#lg-disetujui', '#lg-nomor']
     .forEach(sel => { $(sel).oninput = perbaruiKopLembar; });
   $('#e-tile').onclick = unduhTileArea;
