@@ -514,11 +514,14 @@ td.angka, th.angka { text-align: right; white-space: nowrap; }
 
 @media print {
   @page { size: A4 landscape; margin: 0; }
+  html, body { height: auto !important; overflow: visible !important; }
   body > *:not(.cetak-wrap) { display: none !important; }
   .cetak-wrap.sembunyi { display: none !important; }
-  .cetak-wrap { position: static; background: #fff; padding: 0; overflow: visible; }
+  .cetak-wrap { position: static; background: #fff; padding: 0 !important; overflow: visible; }
   .no-cetak { display: none !important; }
-  .lembar, .rab-lembar { box-shadow: none; margin: 0; }
+  /* satu lembar penuh: skala cetak diatur app.js (siapkanCetak) agar isi
+     sampai tanda tangan muat satu halaman tanpa terpotong */
+  .lembar, .rab-lembar { box-shadow: none; margin: 0 auto; page-break-inside: avoid; }
 }
 
 @media print {
@@ -536,7 +539,5 @@ td.angka, th.angka { text-align: right; white-space: nowrap; }
   .lembar-isian input { flex: 1 1 45%; min-width: 0; font-size: 12px; padding: 7px 8px; }
   .lembar-alat .tombol { flex: 1; padding: 10px 8px; }
 }
-@media print {
-  /* skala layar HP tidak boleh terbawa ke kertas */
-  .lembar, .rab-lembar { zoom: 1 !important; }
-}
+/* skala cetak dikendalikan app.js lewat beforeprint/afterprint —
+   di layar skala mengikuti lebar layar, di kertas skala pas satu halaman */

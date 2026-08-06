@@ -2423,6 +2423,29 @@ function pasSkalaLembar() {
   return skala;
 }
 
+// ---- skala CETAK: seluruh isi lembar (sampai tanda tangan) muat SATU halaman A4 ----
+// A4 lanskap pada 96 dpi ≈ 1122×794 px; disisakan sedikit agar tepi tidak terpotong.
+const CETAK_LEBAR = 1118, CETAK_TINGGI = 786;
+
+function lembarAktif() {
+  if (!$('#rab-wrap').classList.contains('sembunyi')) return $('#rab-lembar');
+  if (!$('#lembar-wrap').classList.contains('sembunyi')) return $('#lembar');
+  return null;
+}
+
+function siapkanCetak() {
+  const el = lembarAktif();
+  if (!el) return;
+  el.style.zoom = '1'; // ukur tinggi asli tanpa skala layar HP
+  const s = Math.min(1, CETAK_LEBAR / el.offsetWidth, CETAK_TINGGI / el.scrollHeight);
+  el.style.zoom = String(s);
+}
+
+function pulihkanCetak() {
+  pasSkalaLembar(); // kembali ke skala layar (HP mengecil, desktop 1:1)
+  if (petaLembar && !$('#lembar-wrap').classList.contains('sembunyi')) petaLembar.invalidateSize();
+}
+
 // arah layar (x ke kanan, y ke bawah) dari titik a menuju b — untuk menaruh
 // lencana/label tegak lurus rute agar tidak menutupi titik taging
 function arahLayar(a, b) {
@@ -2828,11 +2851,14 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#e-csv').onclick = eksporCSV;
   $('#e-kml').onclick = eksporKML;
   $('#e-pdf').onclick = () => { tutupModal('modal-ekspor'); bukaLembarGambar(); };
-  $('#lg-cetak').onclick = () => window.print();
-  $('#lg-tutup').onclick = () => $('#lembar-wrap').classList.add('sembunyi');
+  $('#lg-cetak').onclick = () => { siapkanCetak(); window.print(); };
+  $('#lg-tutup').onclick = () => { $('#lembar-wrap').classList.add('sembunyi'); pulihkanCetak(); };
   $('#e-rabresmi').onclick = () => { tutupModal('modal-ekspor'); bukaRABResmi(); };
-  $('#rb-cetak').onclick = () => window.print();
-  $('#rb-tutup').onclick = () => $('#rab-wrap').classList.add('sembunyi');
+  $('#rb-cetak').onclick = () => { siapkanCetak(); window.print(); };
+  $('#rb-tutup').onclick = () => { $('#rab-wrap').classList.add('sembunyi'); pulihkanCetak(); };
+  // skala pas satu halaman juga saat cetak dari menu browser (Ctrl+P / Bagikan → Cetak)
+  window.addEventListener('beforeprint', siapkanCetak);
+  window.addEventListener('afterprint', pulihkanCetak);
   ['#rb-pekerjaan', '#rb-lokasi', '#rb-kota', '#rb-jab1', '#rb-nama1', '#rb-jab2', '#rb-nama2', '#rb-jab3', '#rb-nama3']
     .forEach(sel => { $(sel).oninput = renderRABResmi; });
   // lembar cetak ikut menyesuaikan saat layar berubah (putar HP / ubah ukuran jendela)
