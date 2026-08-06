@@ -153,7 +153,8 @@ function tambahTugas() {
   });
   ['#t-judul', '#t-untuk', '#t-lokasi', '#t-tikor', '#t-catatan'].forEach(s => { $(s).value = ''; });
   renderTugasDasbor();
-  toast('🗒️ Tugas dibuat — ⬆️ Simpan ke Server agar sampai ke surveyor');
+  toast('🗒️ Tugas dibuat — tersinkron otomatis, surveyor menerimanya saat ⬇️ Ambil dari Server');
+  kirimServer(true);
 }
 
 function renderTugasDasbor() {
@@ -193,7 +194,8 @@ function renderTugasDasbor() {
       t.status = sel.value;
       t.diubah = Date.now();
       renderTugasDasbor();
-      toast(`🗒️ "${t.judul}" → ${STATUS_TUGAS[sel.value].nama} — jangan lupa ⬆️ Simpan ke Server`);
+      toast(`🗒️ "${t.judul}" → ${STATUS_TUGAS[sel.value].nama}`);
+      kirimServer(true);
     };
   });
   wadah.querySelectorAll('[data-peta]').forEach(b => {
@@ -464,6 +466,7 @@ function renderTabelUsulan() {
       p.diubah = Date.now(); // agar perubahan status menang saat sinkron
       renderPeta(); renderRingkasan(); renderTitikUsulan(); renderTabelUsulan(); // lencana ❗/✔ ikut segar
       toast(`${p.nama}: ${(PAKET_PERBAIKAN[entri.paket] || {}).nama} → ${STATUS_USULAN[sel.value].nama}`);
+      kirimServer(true); // langsung tersinkron ke server unit
     };
   });
 }
@@ -639,21 +642,27 @@ function renderSemua() {
   renderHargaTerpusat();
 }
 
-// ---------------- sumber data ----------------
+// ---------------- sinkronisasi otomatis (tanpa panel) ----------------
+// Alamat server & kode unit diambil dari pengaturan aplikasi survey
+// (⚙️ Pengaturan) — dasbor menarik & mengirim sendiri di latar belakang.
 function bacaCfg() {
   try { return JSON.parse(localStorage.getItem(KUNCI_CFG)) || {}; } catch (e) { return {}; }
 }
-function simpanCfg() {
-  localStorage.setItem(KUNCI_CFG, JSON.stringify({ server: $('#d-server').value.trim(), unit: $('#d-unit').value.trim() }));
+
+function cfgServer() {
+  const app = ambilCfgAplikasi();
+  const lama = bacaCfg(); // simpanan dasbor versi lama sebagai cadangan
+  return {
+    server: (app.server || lama.server || '').trim().replace(/\/+$/, ''),
+    unit: (app.unit || lama.unit || '').trim(),
+  };
 }
 
 async function ambilServer() {
-  simpanCfg();
-  const url = $('#d-server').value.trim().replace(/\/+$/, ''), unit = $('#d-unit').value.trim();
-  if (!url || !unit) { toast('Isi alamat server & kode unit'); return; }
-  toast('⬇️ Mengambil data…');
+  const { server, unit } = cfgServer();
+  if (!server || !unit) return; // belum dikonfigurasi → dasbor bekerja dari data perangkat saja
   try {
-    const res = await fetch(url + '/api/data', { headers: { 'X-Kode-Unit': unit } });
+    const res = await fetch(server + '/api/data', { headers: { 'X-Kode-Unit': unit } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
     const hasil = gabung(d.poles);
@@ -662,27 +671,29 @@ async function ambilServer() {
     hargaTerpusat = d.harga || hargaTerpusat;
     riwayatHarga = Array.isArray(d.riwayatHarga) ? d.riwayatHarga : riwayatHarga;
     renderSemua();
-    toast(`✅ ${hasil.baru} baru, ${hasil.diperbarui} diperbarui — total ${hasil.total} titik`
-      + (tugasBaru ? ` · ${tugasBaru} tugas baru` : ''));
-  } catch (e) { toast('Gagal: ' + e.message); }
+    if (hasil.baru || hasil.diperbarui || tugasBaru) {
+      toast(`🔄 Data unit tergabung: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui`
+        + (tugasBaru ? ` · ${tugasBaru} tugas` : ''));
+    }
+  } catch (e) { toast('Server unit tidak terjangkau — dasbor memakai data perangkat ini'); }
 }
 
-async function kirimServer() {
-  simpanCfg();
-  const url = $('#d-server').value.trim().replace(/\/+$/, ''), unit = $('#d-unit').value.trim();
-  if (!url || !unit) { toast('Isi alamat server & kode unit'); return; }
-  if (!poles.length && !tugas.length) { toast('Belum ada data untuk dikirim'); return; }
-  toast('⬆️ Menyimpan ke server…');
+async function kirimServer(senyap) {
+  const { server, unit } = cfgServer();
+  if (!server || !unit) {
+    if (!senyap) toast('Server unit belum diatur (aplikasi → ⚙️ Pengaturan) — perubahan tersimpan di perangkat ini');
+    return;
+  }
+  if (!poles.length && !tugas.length) return;
   try {
-    const res = await fetch(url + '/api/sync', {
+    const res = await fetch(server + '/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': unit },
       body: JSON.stringify({ poles, koreksi, tugas }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const d = await res.json();
-    toast(`✅ Tersimpan — server kini menyimpan ${d.total} titik (status tindak lanjut ikut terbarui)`);
-  } catch (e) { toast('Gagal: ' + e.message); }
+    if (!senyap) toast('✅ Perubahan tersinkron ke server unit');
+  } catch (e) { toast('⚠️ Gagal sinkron ke server — perubahan tersimpan di dasbor ini: ' + e.message); }
 }
 
 // ---------------- data lokal otomatis ----------------
@@ -724,15 +735,9 @@ function ambilCfgAplikasi() {
 document.addEventListener('DOMContentLoaded', () => {
   initPeta();
 
-  // pengaturan server: pakai simpanan dasbor, kalau kosong ikut pengaturan aplikasi survey
-  const cfg = bacaCfg();
-  const cfgApp = ambilCfgAplikasi();
-  $('#d-server').value = cfg.server || cfgApp.server || '';
-  $('#d-unit').value = cfg.unit || cfgApp.unit || '';
-
-  // data survey perangkat ini tampil otomatis; server digabung otomatis bila terisi
+  // data survey perangkat ini tampil otomatis; server unit digabung otomatis di latar belakang
   muatDataLokal();
-  if ($('#d-server').value && $('#d-unit').value) ambilServer();
+  ambilServer();
 
   // segarkan otomatis saat kembali ke tab dasbor / aplikasi menyimpan data baru
   window.addEventListener('focus', () => { if (muatDataLokal()) renderSemua(); });
@@ -747,8 +752,6 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#d-filter-status').onchange = renderTabelUsulan;
   $('#d-filter-jenis').onchange = renderTabelUsulan;
 
-  $('#d-ambil').onclick = ambilServer;
-  $('#d-kirim').onclick = kirimServer;
   $('#t-tambah').onclick = tambahTugas;
 
   $('#d-cari-tombol').onclick = jalankanPencarian;
