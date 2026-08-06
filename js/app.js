@@ -736,7 +736,7 @@ function render() {
       else cm.bindPopup(() => popupTiang(pole));
       return;
     }
-    const m = L.marker([pole.lat, pole.lng], { icon: ikonTiang(pole, idx), draggable: !modeKoreksi });
+    const m = L.marker([pole.lat, pole.lng], { icon: ikonTiang(pole, idx), draggable: !modeKoreksi && bolehUbahTitik(pole) });
     m.on('dragend', (e) => {
       const ll = e.target.getLatLng();
       // konfirmasi dulu — mencegah tikor bergeser karena tersenggol saat menggeser peta
@@ -802,13 +802,19 @@ function popupTiang(pole) {
       <b>Biaya titik ini: ${rupiah(biayaPerTiang(pole).total)}</b>
     </div>`;
   }
-  div.innerHTML = isi + `
+  // tombol ubah hanya untuk pembuat titik / admin — orang lain cukup melihat
+  if (bolehUbahTitik(pole)) {
+    div.innerHTML = isi + `
     <div class="paksi">
       <button class="tombol utama kecil" data-aksi="edit">✏️ Edit</button>
       <button class="tombol bahaya kecil" data-aksi="hapus">🗑 Hapus</button>
     </div>`;
-  div.querySelector('[data-aksi=edit]').onclick = () => { map.closePopup(); bukaFormTiang(pole.id); };
-  div.querySelector('[data-aksi=hapus]').onclick = () => { map.closePopup(); hapusTiang(pole.id); };
+    div.querySelector('[data-aksi=edit]').onclick = () => { map.closePopup(); bukaFormTiang(pole.id); };
+    div.querySelector('[data-aksi=hapus]').onclick = () => { map.closePopup(); hapusTiang(pole.id); };
+  } else {
+    div.innerHTML = isi + `
+    <div class="paksi"><span class="catatan-kecil">🔒 Dibuat oleh <b>${pole.petugas}</b> — hanya pembuat atau admin yang dapat mengubah.</span></div>`;
+  }
   return div;
 }
 
@@ -1052,8 +1058,13 @@ function terapkanModeForm() {
 }
 
 function bukaFormTiang(id, latlng) {
+  const poleCek = id ? state.poles.find(p => p.id === id) : null;
+  if (poleCek && !bolehUbahTitik(poleCek)) {
+    toast(`🔒 ${poleCek.nama} dibuat oleh ${poleCek.petugas} — hanya pembuat atau admin yang dapat mengubah`);
+    return;
+  }
   editId = id;
-  const pole = id ? state.poles.find(p => p.id === id) : null;
+  const pole = poleCek;
   draftLatLng = pole ? { lat: pole.lat, lng: pole.lng } : latlng;
   draftKonstruksi = pole ? pole.konstruksi : draftKonstruksi;
   draftModeTitik = pole ? (pole.mode || 'rencana') : draftModeTitik;
@@ -1233,6 +1244,21 @@ function stempel(p, uidLama) {
   return p;
 }
 
+// ---------------- KEPEMILIKAN TITIK & USULAN ----------------
+// Satu database bersama: semua orang MELIHAT semua titik/usulan, tetapi
+// mengubah/menghapus hanya boleh PEMBUATNYA sendiri atau ADMIN (FR-12).
+// Nama pembuat tidak pernah diganti saat titik diedit orang lain.
+function namaPetugasSaatIni() {
+  const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
+  return (sesi.petugas || state.settings.petugas || '').trim().toLowerCase();
+}
+
+function bolehUbahTitik(p) {
+  if (typeof peranSesi === 'function' && peranSesi() === 'admin') return true;
+  const pemilik = (p.petugas || '').trim().toLowerCase();
+  return !pemilik || pemilik === namaPetugasSaatIni(); // tanpa pemilik = bebas (data lama/impor)
+}
+
 function simpanTiangDariForm() {
   const p = poleDariForm();
   if (!isFinite(p.lat) || !isFinite(p.lng) || p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) {
@@ -1242,7 +1268,10 @@ function simpanTiangDariForm() {
   if (editId) {
     const i = state.poles.findIndex(x => x.id === editId);
     if (i < 0) { toast('Tiang sudah tidak ada — tidak jadi disimpan'); tutupModal('modal-tiang'); return; }
+    if (!bolehUbahTitik(state.poles[i])) { toast('🔒 Hanya pembuat atau admin yang dapat mengubah titik ini'); return; }
     stempel(p, state.poles[i].uid);
+    // pembuat asli dipertahankan — edit (termasuk oleh admin) tidak mengganti nama pembuat
+    p.petugas = state.poles[i].petugas || p.petugas;
     state.poles[i] = p;
     toast(`${p.nama} diperbarui`);
   } else {
@@ -1262,6 +1291,7 @@ function simpanTiangDariForm() {
 function hapusTiang(id) {
   const p = state.poles.find(x => x.id === id);
   if (!p) return;
+  if (!bolehUbahTitik(p)) { toast(`🔒 ${p.nama} dibuat oleh ${p.petugas} — hanya pembuat atau admin yang dapat menghapus`); return; }
   if (!confirm(`Hapus tiang ${p.nama}?`)) return;
   state.poles = state.poles.filter(x => x.id !== id);
   simpan(); render(); renderDaftarTiang();
@@ -1652,14 +1682,18 @@ function renderDaftarTiang() {
         <button class="tombol polos kecil" data-a="naik" ${i === 0 ? 'disabled' : ''}>▲</button>
         <button class="tombol polos kecil" data-a="turun" ${i === state.poles.length - 1 ? 'disabled' : ''}>▼</button>
         <button class="tombol polos kecil" data-a="lihat">📍</button>
-        <button class="tombol utama kecil" data-a="edit">✏️</button>
-        <button class="tombol bahaya kecil" data-a="hapus">🗑</button>
+        ${bolehUbahTitik(p)
+          ? `<button class="tombol utama kecil" data-a="edit">✏️</button>
+             <button class="tombol bahaya kecil" data-a="hapus">🗑</button>`
+          : `<span class="catatan-kecil" title="Dibuat oleh ${p.petugas} — hanya pembuat atau admin yang dapat mengubah">🔒 ${p.petugas}</span>`}
       </div>`;
     div.querySelector('[data-a=naik]').onclick = () => { geserUrutan(i, -1); };
     div.querySelector('[data-a=turun]').onclick = () => { geserUrutan(i, 1); };
     div.querySelector('[data-a=lihat]').onclick = () => { tutupModal('modal-daftar'); map.setView([p.lat, p.lng], 19); };
-    div.querySelector('[data-a=edit]').onclick = () => { tutupModal('modal-daftar'); bukaFormTiang(p.id); };
-    div.querySelector('[data-a=hapus]').onclick = () => hapusTiang(p.id);
+    const btnEdit = div.querySelector('[data-a=edit]');
+    if (btnEdit) btnEdit.onclick = () => { tutupModal('modal-daftar'); bukaFormTiang(p.id); };
+    const btnHapus = div.querySelector('[data-a=hapus]');
+    if (btnHapus) btnHapus.onclick = () => hapusTiang(p.id);
     wadah.appendChild(div);
   });
 }
