@@ -2873,6 +2873,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#e-impor').onchange = (e) => { if (e.target.files[0]) imporJSON(e.target.files[0]); e.target.value = ''; };
   $('#e-hapus').onclick = hapusSemua;
 
+  // tautan cepat lembar cetak: index.html?cetak=rab / ?cetak=gambar
+  const cetakOtomatis = new URLSearchParams(location.search).get('cetak');
+  if (cetakOtomatis === 'rab') setTimeout(() => { bukaRABResmi(); siapkanCetak(); }, 400);
+  if (cetakOtomatis === 'gambar') setTimeout(() => { bukaLembarGambar(); setTimeout(siapkanCetak, 400); }, 400);
+
   // tutup modal (tombol × dan klik latar)
   document.querySelectorAll('[data-tutup]').forEach(b => b.onclick = () => tutupModal(b.dataset.tutup));
   document.querySelectorAll('.modal-latar').forEach(l => {
