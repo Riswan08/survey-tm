@@ -488,12 +488,37 @@ td.angka, th.angka { text-align: right; white-space: nowrap; }
   text-shadow: 0 0 3px #000, 0 0 5px #000; white-space: nowrap;
 }
 
+/* ===== lembar RAB resmi (cetak / PDF) ===== */
+#rab-wrap { position: fixed; inset: 0; z-index: 1400; background: #3a4654; overflow: auto; padding: 10px; }
+#rab-wrap.sembunyi { display: none; }
+.rab-lembar {
+  width: 1122px; min-height: 792px; margin: 0 auto; background: #fff;
+  padding: 34px 44px; box-shadow: 0 4px 18px rgba(0,0,0,.4);
+  font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 12px;
+}
+.rab-lembar .rjudul { text-align: center; font-size: 16px; font-weight: 800; text-decoration: underline; margin-bottom: 16px; letter-spacing: .5px; }
+.rab-lembar .rinfo { margin: 0 0 10px 60px; font-weight: 700; }
+.rab-lembar .rinfo span { display: inline-block; width: 90px; }
+.rab-lembar table.rtab { width: 100%; border-collapse: collapse; }
+.rab-lembar table.rtab th, .rab-lembar table.rtab td { border: 1.2px solid #000; padding: 3px 7px; font-size: 11.5px; }
+.rab-lembar table.rtab th { text-align: center; font-weight: 700; }
+.rab-lembar td.angka { text-align: right; font-weight: 700; white-space: nowrap; }
+.rab-lembar td.tengah { text-align: center; font-weight: 700; }
+.rab-lembar tr.seksi td { background: #dcdcdc; font-weight: 800; }
+.rab-lembar tr.rekap td { font-weight: 800; }
+.rab-lembar td.uraian { font-weight: 700; }
+.rab-lembar .ttd { display: flex; justify-content: space-between; margin: 26px 40px 0; text-align: center; font-weight: 700; }
+.rab-lembar .ttd .blok { min-width: 260px; }
+.rab-lembar .ttd .nama, .rab-lembar .ttd-tengah .nama { margin-top: 84px; font-weight: 800; text-transform: uppercase; }
+.rab-lembar .ttd-tengah { text-align: center; font-weight: 700; margin-top: 8px; }
+
 @media print {
   @page { size: A4 landscape; margin: 0; }
-  body > *:not(#lembar-wrap) { display: none !important; }
-  #lembar-wrap { position: static; background: #fff; padding: 0; overflow: visible; }
+  body > *:not(.cetak-wrap) { display: none !important; }
+  .cetak-wrap.sembunyi { display: none !important; }
+  .cetak-wrap { position: static; background: #fff; padding: 0; overflow: visible; }
   .no-cetak { display: none !important; }
-  .lembar { box-shadow: none; margin: 0; }
+  .lembar, .rab-lembar { box-shadow: none; margin: 0; }
 }
 
 @media print {

@@ -2601,6 +2601,126 @@ function perbaruiKopLembar() {
   $('#lg-judul-peta').textContent = (judul + (lokasi ? ' ' + lokasi : '')).toUpperCase() || 'GAMBAR RENCANA';
 }
 
+// ---------------- LEMBAR RAB RESMI (CETAK / PDF, format UP3) ----------------
+// Tabel persis format resmi unit: kolom Harga Satuan & Jumlah Harga terpisah
+// Material/Jasa, baris Jumlah → DPP (11/12) → PPn 12% → Jumlah Total, terbilang,
+// dan blok tanda tangan (nama/jabatan dapat diubah lewat isian di atas lembar).
+function terbilang(n) {
+  n = Math.round(Math.abs(Number(n) || 0));
+  const angkaDasar = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+  const ke = (x) => {
+    if (x < 12) return angkaDasar[x];
+    if (x < 20) return ke(x - 10) + ' Belas';
+    if (x < 100) return ke(Math.floor(x / 10)) + ' Puluh' + (x % 10 ? ' ' + ke(x % 10) : '');
+    if (x < 200) return 'Seratus' + (x % 100 ? ' ' + ke(x % 100) : '');
+    if (x < 1000) return ke(Math.floor(x / 100)) + ' Ratus' + (x % 100 ? ' ' + ke(x % 100) : '');
+    if (x < 2000) return 'Seribu' + (x % 1000 ? ' ' + ke(x % 1000) : '');
+    if (x < 1e6) return ke(Math.floor(x / 1000)) + ' Ribu' + (x % 1000 ? ' ' + ke(x % 1000) : '');
+    if (x < 1e9) return ke(Math.floor(x / 1e6)) + ' Juta' + (x % 1e6 ? ' ' + ke(x % 1e6) : '');
+    if (x < 1e12) return ke(Math.floor(x / 1e9)) + ' Miliar' + (x % 1e9 ? ' ' + ke(x % 1e9) : '');
+    return ke(Math.floor(x / 1e12)) + ' Triliun' + (x % 1e12 ? ' ' + ke(x % 1e12) : '');
+  };
+  return n ? ke(n) : 'Nol';
+}
+
+function renderRABResmi() {
+  const rab = hitungRAB();
+  const nilai = (sel) => $(sel).value.trim();
+  const sel = (v) => (v ? angka(v) : ''); // sel kosong bila nol — seperti format asli
+
+  let no = 0;
+  let totM = 0, totJ = 0;
+  let barisHTML = '';
+  const seksi = (judul) => { no++; barisHTML += `<tr class="seksi"><td class="tengah">${no}</td><td colspan="8">${judul}</td></tr>`; };
+  const baris = (uraian, sat, vol, volTeks, hm, hj) => {
+    no++;
+    const jm = Math.round(vol * hm), jj = Math.round(vol * hj);
+    totM += jm; totJ += jj;
+    barisHTML += `<tr>
+      <td class="tengah">${no}</td><td class="uraian">${uraian}</td>
+      <td class="tengah">${sat}</td><td class="tengah" style="font-weight:700">${volTeks}</td>
+      <td class="angka">${sel(hm)}</td><td class="angka">${sel(hj)}</td>
+      <td class="angka">${sel(jm)}</td><td class="angka">${sel(jj)}</td>
+      <td class="angka">${sel(jm + jj)}</td></tr>`;
+  };
+
+  if (rab.barisRekap.length || rab.panjangKawat) {
+    seksi('MATERIAL');
+    rab.barisRekap.forEach(b => baris(b.nama, b.satuan, b.qty, angka(b.qty), b.harga, b.jasa));
+    if (rab.panjangKawat > 0) {
+      baris(`${rab.ph.nama} (${rab.ph.fasa} fasa × faktor andongan ${state.settings.sagFactor})`,
+        'Mtr', Math.round(rab.panjangKawat), angka(rab.panjangKawat, 0), hargaEfektif(state.settings.penghantar), 0);
+    }
+  }
+  if (polesRencana().length) {
+    seksi('JASA');
+    baris(MATERIALS.JASA_TIANG.nama, 'Btg', polesRencana().length, angka(polesRencana().length), 0, hargaEfektif('JASA_TIANG'));
+    if (rab.rutePenghantar > 0) {
+      baris(MATERIALS.JASA_TARIK.nama, 'Km', rab.rutePenghantar / 1000, angka(rab.rutePenghantar / 1000, 2), 0, hargaEfektif('JASA_TARIK'));
+    }
+  }
+  if (rab.daftarUsulan.length) {
+    seksi('USULAN PERBAIKAN ASET EKSISTING');
+    rab.daftarUsulan.forEach(u => baris(`${u.paket} — ${u.aset}`, 'Pkt', 1, '1', u.material, u.jasa));
+  }
+
+  // Jumlah → DPP (11/12 dari jumlah) → PPn 12% → Jumlah Total, per kolom seperti format asli
+  const jumlah = totM + totJ;
+  const dppM = Math.round(totM * 11 / 12), dppJ = Math.round(totJ * 11 / 12), dppT = Math.round(jumlah * 11 / 12);
+  const ppnM = Math.round(dppM * 0.12), ppnJ = Math.round(dppJ * 0.12), ppnT = Math.round(dppT * 0.12);
+  const rekapBaris = (label, m, j, t) => `<tr class="rekap">
+    <td colspan="6" style="text-align:right">${label}</td>
+    <td class="angka">${angka(m)}</td><td class="angka">${angka(j)}</td><td class="angka">${angka(t)}</td></tr>`;
+
+  const tanggal = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  $('#rab-lembar').innerHTML = `
+    <div class="rjudul">RENCANA ANGGARAN BIAYA</div>
+    <div class="rinfo"><span>Pekerjaan</span>: ${nilai('#rb-pekerjaan') || '—'}</div>
+    <div class="rinfo" style="margin-bottom:14px"><span>Lokasi</span>: ${nilai('#rb-lokasi') || '—'}</div>
+    <table class="rtab">
+      <tr>
+        <th rowspan="2" style="width:46px">No.</th><th rowspan="2">Uraian Barang/Jasa</th>
+        <th rowspan="2" style="width:56px">Sat</th><th rowspan="2" style="width:66px">Vol</th>
+        <th colspan="2">Harga Satuan</th><th colspan="2">Jumlah Harga</th>
+        <th rowspan="1" style="width:110px">Jumlah Total</th>
+      </tr>
+      <tr>
+        <th style="width:100px">Material (Rp)</th><th style="width:88px">Jasa (Rp)</th>
+        <th style="width:110px">Material (Rp)</th><th style="width:88px">Jasa (Rp)</th>
+        <th>(Rp)</th>
+      </tr>
+      <tr>
+        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7 = 4 x 5</th><th>8 = 4 x 6</th><th>10 = 7 + 8</th>
+      </tr>
+      <tr><td colspan="9" style="height:14px;border-left:1.2px solid #000;border-right:1.2px solid #000"></td></tr>
+      ${barisHTML || '<tr><td colspan="9" style="text-align:center">Belum ada data survey — lakukan taging terlebih dahulu.</td></tr>'}
+      ${rekapBaris('Jumlah', totM, totJ, jumlah)}
+      ${rekapBaris('DPP', dppM, dppJ, dppT)}
+      ${rekapBaris('PPn 12%', ppnM, ppnJ, ppnT)}
+      ${rekapBaris('Jumlah Total', totM + ppnM, totJ + ppnJ, jumlah + ppnT)}
+      <tr><td colspan="9" style="font-weight:800">Terbilang : ${terbilang(jumlah + ppnT)} Rupiah</td></tr>
+    </table>
+    <div class="ttd">
+      <div class="blok">&nbsp;<br>Mengetahui<br>${nilai('#rb-jab1') || '—'}<div class="nama">${nilai('#rb-nama1') || '(..........................)'}</div></div>
+      <div class="blok">${nilai('#rb-kota') || 'Masohi'}, ${tanggal}<br>Membuat<br>${nilai('#rb-jab2') || '—'}<div class="nama">${nilai('#rb-nama2') || '(..........................)'}</div></div>
+    </div>
+    <div class="ttd-tengah">Menyetujui<br>${nilai('#rb-jab3') || '—'}<div class="nama">${nilai('#rb-nama3') || '(..........................)'}</div></div>`;
+}
+
+function bukaRABResmi() {
+  const s = state.settings;
+  const isi = (sel2, v) => { const el = $(sel2); if (!el.value) el.value = v || ''; };
+  isi('#rb-pekerjaan', (s.namaPekerjaan ? `${JENIS_PEKERJAAN[s.jenisPekerjaan] || ''} ${s.namaPekerjaan}` : JENIS_PEKERJAAN[s.jenisPekerjaan] || '').trim());
+  isi('#rb-lokasi', 'PT PLN (Persero) UP3 Masohi');
+  isi('#rb-kota', 'Masohi');
+  isi('#rb-jab1', 'Assistant Manager Perencanaan');
+  isi('#rb-jab2', 'Team Leader Perencanaan Sistem');
+  isi('#rb-nama2', s.petugas || '');
+  isi('#rb-jab3', 'Manager UP3 Masohi');
+  renderRABResmi();
+  $('#rab-wrap').classList.remove('sembunyi');
+}
+
 // ---------------- MODAL ----------------
 function bukaModal(id) { $('#' + id).classList.add('tampil'); }
 function tutupModal(id) { $('#' + id).classList.remove('tampil'); }
@@ -2696,6 +2816,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#e-pdf').onclick = () => { tutupModal('modal-ekspor'); bukaLembarGambar(); };
   $('#lg-cetak').onclick = () => window.print();
   $('#lg-tutup').onclick = () => $('#lembar-wrap').classList.add('sembunyi');
+  $('#e-rabresmi').onclick = () => { tutupModal('modal-ekspor'); bukaRABResmi(); };
+  $('#rb-cetak').onclick = () => window.print();
+  $('#rb-tutup').onclick = () => $('#rab-wrap').classList.add('sembunyi');
+  ['#rb-pekerjaan', '#rb-lokasi', '#rb-kota', '#rb-jab1', '#rb-nama1', '#rb-jab2', '#rb-nama2', '#rb-jab3', '#rb-nama3']
+    .forEach(sel => { $(sel).oninput = renderRABResmi; });
   ['#lg-judul', '#lg-lokasi', '#lg-digambar', '#lg-diperiksa', '#lg-disetujui', '#lg-nomor']
     .forEach(sel => { $(sel).oninput = perbaruiKopLembar; });
   $('#e-tile').onclick = unduhTileArea;

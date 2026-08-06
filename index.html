@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=34">
+  <link rel="stylesheet" href="css/style.css?v=35">
 </head>
 <body>
 
@@ -260,6 +260,7 @@
           <button class="tombol utama" id="e-csv">📊 Ekspor RAB ke CSV / Excel</button>
           <button class="tombol utama" id="e-kml">🌍 Ekspor Titik ke KML (Google Earth)</button>
           <button class="tombol utama" id="e-pdf">📄 Gambar Rencana — Cetak / PDF (template unit)</button>
+          <button class="tombol utama" id="e-rabresmi">🧾 RAB Resmi — Cetak / PDF (format UP3)</button>
         </div>
         <div class="judul-seksi">Peta Offline</div>
         <p class="catatan-kecil" style="margin-bottom:10px">Sebelum ke lokasi tanpa sinyal: buka area kerja di peta, lalu unduh. Tile peta tersimpan di HP dan tampil saat offline. GPS &amp; taging selalu berfungsi walau peta belum diunduh.</p>
@@ -294,8 +295,34 @@
     </div>
   </div>
 
+  <!-- ===== LEMBAR RAB RESMI (CETAK / PDF, format UP3) ===== -->
+  <div id="rab-wrap" class="cetak-wrap sembunyi">
+    <div class="lembar-alat no-cetak">
+      <div class="lembar-isian">
+        <input type="text" id="rb-pekerjaan" placeholder="Pekerjaan" maxlength="90">
+        <input type="text" id="rb-lokasi" placeholder="Lokasi" maxlength="90">
+        <input type="text" id="rb-kota" placeholder="Kota (mis. Masohi)" maxlength="30" style="max-width:140px">
+      </div>
+      <div class="lembar-isian">
+        <input type="text" id="rb-jab1" placeholder="Jabatan Mengetahui" maxlength="60">
+        <input type="text" id="rb-nama1" placeholder="Nama Mengetahui" maxlength="50">
+        <input type="text" id="rb-jab2" placeholder="Jabatan Membuat" maxlength="60">
+        <input type="text" id="rb-nama2" placeholder="Nama Membuat" maxlength="50">
+        <input type="text" id="rb-jab3" placeholder="Jabatan Menyetujui" maxlength="60">
+        <input type="text" id="rb-nama3" placeholder="Nama Menyetujui" maxlength="50">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="tombol utama" id="rb-cetak">🖨 Cetak / Simpan PDF</button>
+        <button class="tombol polos" id="rb-tutup">× Tutup</button>
+      </div>
+      <p class="catatan-kecil" style="margin:6px 0 0">Isi/ubah nama &amp; jabatan di atas — lembar di bawah ikut berubah.
+        🖨 lalu pilih <b>Save as PDF</b>, kertas <b>A4 Lanskap</b>, margin <b>None</b>.</p>
+    </div>
+    <div class="rab-lembar" id="rab-lembar"></div>
+  </div>
+
   <!-- ===== LEMBAR GAMBAR RENCANA (CETAK / PDF) ===== -->
-  <div id="lembar-wrap" class="sembunyi">
+  <div id="lembar-wrap" class="cetak-wrap sembunyi">
     <div class="lembar-alat no-cetak">
       <div class="lembar-isian">
         <input type="text" id="lg-judul" placeholder="Judul gambar (mis. PINDAH JARINGAN SUTM)" maxlength="60">
@@ -346,9 +373,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=34"></script>
-  <script src="js/app.js?v=34"></script>
-  <script src="js/masuk.js?v=34"></script>
+  <script src="js/data.js?v=35"></script>
+  <script src="js/app.js?v=35"></script>
+  <script src="js/masuk.js?v=35"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
