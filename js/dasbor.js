@@ -685,44 +685,60 @@ async function kirimServer() {
   } catch (e) { toast('Gagal: ' + e.message); }
 }
 
-function imporFiles(files) {
-  let selesai = 0, totalBaru = 0, totalUbah = 0;
-  [...files].forEach(file => {
-    const r = new FileReader();
-    r.onload = () => {
-      try {
-        const d = JSON.parse(r.result);
-        const hasil = gabung(Array.isArray(d.poles) ? d.poles : (Array.isArray(d) ? d : []));
+// ---------------- data lokal otomatis ----------------
+// Dasbor membaca langsung data survey di perangkat ini (semua proyek) —
+// pekerjaan/usulan yang baru disimpan di aplikasi langsung tampil di sini
+// tanpa impor manual. Data server tetap digabung saat tersambung.
+function muatDataLokal() {
+  const kunci = ['survey_tm_v1'];
+  try {
+    const reg = JSON.parse(localStorage.getItem('cakra_proyek'));
+    (reg && Array.isArray(reg.daftar) ? reg.daftar : []).forEach(p => {
+      if (p && typeof p.id === 'string' && p.id !== 'utama') kunci.push('survey_tm_v1_' + p.id);
+    });
+  } catch (e) { /* registry proyek tidak ada — cukup kunci utama */ }
+  let baru = 0, ubah = 0;
+  kunci.forEach(k => {
+    try {
+      const d = JSON.parse(localStorage.getItem(k));
+      if (d && Array.isArray(d.poles)) {
+        const hasil = gabung(d.poles);
+        baru += hasil.baru; ubah += hasil.diperbarui;
         gabungKoreksi(d.koreksi);
-        totalBaru += hasil.baru; totalUbah += hasil.diperbarui;
-      } catch (e) { toast(`${file.name}: file tidak valid`); }
-      if (++selesai === files.length) {
-        renderSemua();
-        toast(`✅ ${files.length} file diimpor — ${totalBaru} titik baru, ${totalUbah} diperbarui`);
       }
-    };
-    r.readAsText(file);
+    } catch (e) { /* proyek rusak dilewati */ }
   });
+  return baru + ubah;
 }
 
-function unduhGabungan() {
-  if (!poles.length) { toast('Belum ada data'); return; }
-  const blob = new Blob([JSON.stringify({ poles, koreksi, tugas }, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'CAKRA-Gabungan.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast('JSON gabungan diunduh — bisa dibuka kembali di aplikasi survey / dasbor');
+// pengaturan server dari aplikasi survey ikut dipakai dasbor (satu kali isi saja)
+function ambilCfgAplikasi() {
+  try {
+    const d = JSON.parse(localStorage.getItem('survey_tm_v1'));
+    const s = (d && d.settings) || {};
+    return { server: s.server || '', unit: s.kodeUnit || '' };
+  } catch (e) { return { server: '', unit: '' }; }
 }
 
 // ---------------- init ----------------
 document.addEventListener('DOMContentLoaded', () => {
   initPeta();
 
+  // pengaturan server: pakai simpanan dasbor, kalau kosong ikut pengaturan aplikasi survey
   const cfg = bacaCfg();
-  $('#d-server').value = cfg.server || '';
-  $('#d-unit').value = cfg.unit || '';
+  const cfgApp = ambilCfgAplikasi();
+  $('#d-server').value = cfg.server || cfgApp.server || '';
+  $('#d-unit').value = cfg.unit || cfgApp.unit || '';
+
+  // data survey perangkat ini tampil otomatis; server digabung otomatis bila terisi
+  muatDataLokal();
+  if ($('#d-server').value && $('#d-unit').value) ambilServer();
+
+  // segarkan otomatis saat kembali ke tab dasbor / aplikasi menyimpan data baru
+  window.addEventListener('focus', () => { if (muatDataLokal()) renderSemua(); });
+  window.addEventListener('storage', (e) => {
+    if (e.key && e.key.startsWith('survey_tm_v1')) { muatDataLokal(); renderSemua(); }
+  });
 
   $('#d-filter-status').innerHTML += Object.entries(STATUS_USULAN)
     .map(([kode, st]) => `<option value="${kode}">${st.nama}</option>`).join('');
@@ -733,13 +749,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('#d-ambil').onclick = ambilServer;
   $('#d-kirim').onclick = kirimServer;
-  $('#d-file').onchange = (e) => { if (e.target.files.length) imporFiles(e.target.files); e.target.value = ''; };
-  $('#d-unduh').onclick = unduhGabungan;
-  $('#d-bersih').onclick = () => {
-    if (!poles.length || confirm('Kosongkan data dasbor? (data di server / file tidak terhapus)')) {
-      poles = []; koreksi = []; tugas = []; sudahFit = false; renderSemua();
-    }
-  };
   $('#t-tambah').onclick = tambahTugas;
 
   $('#d-cari-tombol').onclick = jalankanPencarian;
