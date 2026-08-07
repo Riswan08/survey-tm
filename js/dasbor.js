@@ -77,11 +77,14 @@ function perluasanPerPekerjaan() {
     (grup[kunci] = grup[kunci] || []).push(p);
   });
   const hasil = {};
+  const trKah = (p) => (KONSTRUKSI[p.konstruksi] || {}).grup === 'JTR';
   Object.entries(grup).forEach(([nama, daftar]) => {
-    let rute = 0;
+    // rute dipilah JTM / JTR per gawang (gawang JTR = salah satu ujungnya konstruksi TR)
+    let ruteJTM = 0, ruteJTR = 0;
     for (let i = 1; i < daftar.length; i++) {
       const d = jarakM(daftar[i - 1], daftar[i]);
-      if (d <= 2000) rute += d; // bentang > 2 km = bukan satu rantai (lokasi berbeda) — dilewati
+      if (d > 2000) continue; // bentang > 2 km = bukan satu rantai (lokasi berbeda) — dilewati
+      if (trKah(daftar[i - 1]) || trKah(daftar[i])) ruteJTR += d; else ruteJTM += d;
     }
     let biaya = 0, mulai = 0, akhir = 0;
     daftar.forEach(p => {
@@ -89,10 +92,26 @@ function perluasanPerPekerjaan() {
       const t = p.diubah || 0;
       if (t) { if (!mulai || t < mulai) mulai = t; if (t > akhir) akhir = t; }
     });
-    biaya += rute * 3 * 1.03 * hargaMat('PH_AAAC70') + (rute / 1000) * hargaMat('JASA_TARIK');
-    hasil[nama] = { tiang: daftar.length, rute, biaya, mulai, akhir };
+    const rute = ruteJTM + ruteJTR;
+    // perkiraan penghantar: JTM = AAAC 70 (3 fasa), JTR = kabel pilin LVTC 3×70+50
+    biaya += ruteJTM * 3 * 1.03 * hargaMat('PH_AAAC70')
+           + ruteJTR * 1.03 * hargaMat('PH_LVTC70')
+           + (rute / 1000) * hargaMat('JASA_TARIK');
+    hasil[nama] = {
+      tiang: daftar.length,
+      tiangJTM: daftar.filter(p => !trKah(p)).length,
+      tiangJTR: daftar.filter(trKah).length,
+      rute, ruteJTM, ruteJTR, biaya, mulai, akhir,
+    };
   });
   return hasil;
+}
+
+function fmtRute(m) {
+  if (!m) return '—';
+  return m >= 1000
+    ? (m / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' km'
+    : angka(m) + ' m';
 }
 
 // tahap pekerjaan (survey→diusulkan→disetujui→konstruksi→selesai)
@@ -466,16 +485,15 @@ function renderRingkasan() {
   // baris pertama: PERLUASAN JTM — fokus utama pemantauan
   const perluasan = perluasanPerPekerjaan();
   const namaPerluasan = Object.keys(perluasan);
-  const totTiang = namaPerluasan.reduce((a, n) => a + perluasan[n].tiang, 0);
-  const totRute = namaPerluasan.reduce((a, n) => a + perluasan[n].rute, 0);
-  const totBiaya = namaPerluasan.reduce((a, n) => a + perluasan[n].biaya, 0);
+  const jml = (kunci) => namaPerluasan.reduce((a, n) => a + perluasan[n][kunci], 0);
+  const totTiang = jml('tiang'), totTiangJTM = jml('tiangJTM'), totTiangJTR = jml('tiangJTR');
+  const totRute = jml('rute'), totRuteJTM = jml('ruteJTM'), totRuteJTR = jml('ruteJTR');
+  const totBiaya = jml('biaya');
   const gayaUtama = 'background:#e8f2fb;border-color:#9ec4e4';
   let html = `
-    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${namaPerluasan.length}</div><div class="ket"><b>PEKERJAAN PERLUASAN JTM</b></div></div>
-    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${totTiang}</div><div class="ket"><b>TIANG RENCANA</b> (semua pekerjaan)</div></div>
-    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${totRute >= 1000
-      ? (totRute / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' km'
-      : angka(totRute) + ' m'}</div><div class="ket"><b>PANJANG RUTE JARINGAN</b></div></div>
+    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${namaPerluasan.length}</div><div class="ket"><b>PEKERJAAN PERLUASAN</b> JTM &amp; JTR</div></div>
+    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${totTiang}</div><div class="ket"><b>TIANG RENCANA</b> — JTM ${totTiangJTM} · JTR ${totTiangJTR}</div></div>
+    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${fmtRute(totRute)}</div><div class="ket"><b>PANJANG RUTE</b> — JTM ${fmtRute(totRuteJTM)} · JTR ${fmtRute(totRuteJTR)}</div></div>
     <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${rupiah(totBiaya)}</div><div class="ket"><b>± NILAI RAB PERLUASAN</b></div></div>`;
 
   // baris berikutnya: survey aset & tindak lanjut (pelengkap)
@@ -561,10 +579,12 @@ function renderDaftarPekerjaan() {
         <td><b>${nama}</b></td>
         <td>${[...g.ulp].join(', ') || '—'}</td>
         <td>${[...g.petugas].join(', ') || '—'}</td>
-        <td class="angka">${pl ? pl.tiang : '—'}</td>
-        <td class="angka">${pl && pl.rute ? (pl.rute >= 1000
-          ? (pl.rute / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' km'
-          : angka(pl.rute) + ' m') : '—'}</td>
+        <td class="angka">${pl
+          ? `${pl.tiang}${pl.tiangJTR ? `<br><small>JTM ${pl.tiangJTM} · JTR ${pl.tiangJTR}</small>` : ''}`
+          : '—'}</td>
+        <td class="angka">${pl && pl.rute
+          ? `${fmtRute(pl.rute)}${pl.ruteJTR ? `<br><small>JTM ${fmtRute(pl.ruteJTM)} · JTR ${fmtRute(pl.ruteJTR)}</small>` : ''}`
+          : '—'}</td>
         <td class="angka"><b>${pl ? angka(pl.biaya) : '—'}</b></td>
         <td>${selTahap}</td>
         <td class="angka">${g.pelanggan
