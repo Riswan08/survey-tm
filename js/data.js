@@ -419,6 +419,15 @@ const PERAN = {
   admin:     { nama: 'Admin',     ikon: '🛠️' },
 };
 
+// tahapan pekerjaan perluasan jaringan — progres dipantau dari dasbor
+const STATUS_PEKERJAAN = {
+  survey:     { nama: 'Survey Lapangan', warna: '#607d8b', persen: 20 },
+  diusulkan:  { nama: 'Diusulkan',       warna: '#0288d1', persen: 40 },
+  disetujui:  { nama: 'Disetujui',       warna: '#7b1fa2', persen: 60 },
+  konstruksi: { nama: 'Konstruksi',      warna: '#f57c00', persen: 80 },
+  selesai:    { nama: 'Selesai',         warna: '#2e7d32', persen: 100 },
+};
+
 // status penugasan survey (FR-16)
 const STATUS_TUGAS = {
   baru:       { nama: 'Baru',       warna: '#607d8b' },

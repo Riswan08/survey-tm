@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=43">
+  <link rel="stylesheet" href="css/style.css?v=44">
   <style>
     /* tata letak khusus dasbor: halaman menggulir, peta di panel */
     body { overflow: auto; background: var(--abu); }
@@ -38,6 +38,16 @@
       width: 100%; height: 10px; background: #e4e9ee; border-radius: 6px; overflow: hidden; margin-bottom: 2px;
     }
     .batang-progres div { height: 100%; background: var(--hijau); border-radius: 6px; }
+    /* timeline pekerjaan perluasan */
+    .tl-sumbu { display: flex; justify-content: space-between; font-size: 10px; color: #61707f; font-weight: 700; margin: 6px 0 5px; }
+    .tl-baris { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .tl-nama { width: 210px; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; }
+    .tl-rel { position: relative; flex: 1; height: 24px; background: #f0f4f8; border-radius: 6px; }
+    .tl-bar { position: absolute; top: 0; bottom: 0; border-radius: 6px; color: #fff; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; padding: 0 8px; white-space: nowrap; overflow: hidden; max-width: 100%; }
+    .tl-kini { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #e53935; z-index: 2; }
+    .tl-tgl { font-size: 10px; color: #61707f; white-space: nowrap; flex: 0 0 auto; }
+    @media (max-width: 600px) { .tl-nama { width: 110px; } .tl-tgl { display: none; } }
     /* ---- tampilan HP ---- */
     @media (max-width: 600px) {
       #isi-dasbor { padding: 60px 6px 24px; }
@@ -80,6 +90,10 @@
         berapa <b>tiang rencana</b>, <b>panjang rute</b>, <b>perkiraan nilai RAB</b>-nya, siapa pengerjanya, dan
         kapan terakhir disimpan. Pekerjaan perluasan selalu di urutan atas.</p>
       <div class="bungkus-tabel" id="d-pekerjaan"></div>
+      <div class="judul-seksi" style="margin-top:14px">🗓 Timeline Pekerjaan Perluasan</div>
+      <p class="catatan-kecil">Batang = rentang waktu pekerjaan (titik pertama disimpan → aktivitas terakhir),
+        warnanya mengikuti tahap. Garis merah = posisi hari ini.</p>
+      <div id="d-timeline"></div>
     </div>
 
     <div class="panel">
@@ -150,8 +164,8 @@
   <div id="lightbox"><img alt="eviden"><div class="ket"></div></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=43"></script>
-  <script src="js/dasbor.js?v=43"></script>
-  <script src="js/masuk.js?v=43"></script>
+  <script src="js/data.js?v=44"></script>
+  <script src="js/dasbor.js?v=44"></script>
+  <script src="js/masuk.js?v=44"></script>
 </body>
 </html>

@@ -104,6 +104,24 @@ function gabungHarga(lama, masuk, riwayat) {
   return { harga: bersih, riwayat: log, berubah: true };
 }
 
+// tahap pekerjaan perluasan: per nama pekerjaan, stempel `diubah` terbaru menang
+function gabungStatusPekerjaan(lama, masuk) {
+  const hasil = {};
+  Object.entries(lama || {}).forEach(([k, v]) => { if (v && typeof v === 'object') hasil[k] = v; });
+  Object.entries(masuk || {}).forEach(([k, v]) => {
+    if (!v || typeof v !== 'object' || typeof k !== 'string' || k.length > 100) return;
+    const ada = hasil[k];
+    if (!ada || (Number(v.diubah) || 0) > (Number(ada.diubah) || 0)) {
+      hasil[k] = {
+        status: String(v.status || 'survey').slice(0, 20),
+        diubah: Number(v.diubah) || 0,
+        oleh: String(v.oleh || '').slice(0, 40),
+      };
+    }
+  });
+  return hasil;
+}
+
 // gabung koreksi sambungan antar tiang: per pasangan, `diubah` terbaru menang
 function gabungKoreksi(lama, masuk) {
   const kunci = (k) => (k.a < k.b ? k.a + '|' + k.b : k.b + '|' + k.a);
@@ -165,6 +183,7 @@ http.createServer((req, res) => {
       kirimJSON(res, 200, {
         poles: d.poles, koreksi: d.koreksi || [], tugas: d.tugas || [],
         harga: d.harga || null, riwayatHarga: d.riwayatHarga || [],
+        pekerjaanStatus: d.pekerjaanStatus || {},
         diperbarui: d.diperbarui,
       });
       return;
@@ -184,9 +203,11 @@ http.createServer((req, res) => {
           const koreksi = gabungKoreksi(lama.koreksi, masuk.koreksi);
           const tugas = gabungTugas(lama.tugas, masuk.tugas);
           const h = gabungHarga(lama.harga, masuk.harga, lama.riwayatHarga);
+          const pekerjaanStatus = gabungStatusPekerjaan(lama.pekerjaanStatus, masuk.pekerjaanStatus);
           tulisUnit(kode, {
             poles: hasil.poles, koreksi, tugas,
             harga: h.harga || null, riwayatHarga: h.riwayat || [],
+            pekerjaanStatus,
             diperbarui: Date.now(),
           });
           console.log(`[sync] ${kode}: +${hasil.baru} baru, ${hasil.diperbarui} diperbarui, total ${hasil.poles.length}, `

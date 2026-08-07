@@ -11,6 +11,7 @@ let asetStatis = [];  // aset TM bawaan (data/aset-tm.json)
 let tugas = [];       // penugasan survey (FR-16) — ikut tersinkron
 let hargaTerpusat = null;  // master harga unit (FR-15) — info dari server
 let riwayatHarga = [];
+let pekerjaanStatus = {};  // tahap pekerjaan perluasan: nama -> {status, diubah, oleh}
 const KUNCI_CFG = 'cakra_dasbor_cfg';
 const kunciPasangan = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
 
@@ -82,12 +83,30 @@ function perluasanPerPekerjaan() {
       const d = jarakM(daftar[i - 1], daftar[i]);
       if (d <= 2000) rute += d; // bentang > 2 km = bukan satu rantai (lokasi berbeda) — dilewati
     }
-    let biaya = 0;
-    daftar.forEach(p => { biaya += biayaTitikRencana(p); });
+    let biaya = 0, mulai = 0, akhir = 0;
+    daftar.forEach(p => {
+      biaya += biayaTitikRencana(p);
+      const t = p.diubah || 0;
+      if (t) { if (!mulai || t < mulai) mulai = t; if (t > akhir) akhir = t; }
+    });
     biaya += rute * 3 * 1.03 * hargaMat('PH_AAAC70') + (rute / 1000) * hargaMat('JASA_TARIK');
-    hasil[nama] = { tiang: daftar.length, rute, biaya };
+    hasil[nama] = { tiang: daftar.length, rute, biaya, mulai, akhir };
   });
   return hasil;
+}
+
+// tahap pekerjaan (survey→diusulkan→disetujui→konstruksi→selesai)
+function tahapPekerjaan(nama) {
+  const s = (pekerjaanStatus[nama] || {}).status;
+  return STATUS_PEKERJAAN[s] ? s : 'survey';
+}
+
+function gabungPekerjaanStatus(masuk) {
+  Object.entries(masuk || {}).forEach(([k, v]) => {
+    if (!v || typeof v !== 'object') return;
+    const ada = pekerjaanStatus[k];
+    if (!ada || (Number(v.diubah) || 0) > (Number(ada.diubah) || 0)) pekerjaanStatus[k] = v;
+  });
 }
 
 // ---------------- normalisasi & gabung ----------------
@@ -505,9 +524,11 @@ function renderDaftarPekerjaan() {
   });
 
   const perluasan = perluasanPerPekerjaan();
+  const bolehUbah = typeof bolehKelolaUsulan === 'function' && bolehKelolaUsulan();
   let html = `<table class="rab"><tr>
     <th>Nama Pekerjaan</th><th>Unit</th><th>Petugas</th>
     <th class="angka">Tiang Rencana</th><th class="angka">Rute</th><th class="angka">± RAB Perluasan (Rp)</th>
+    <th style="min-width:150px">Tahap &amp; Progres</th>
     <th class="angka">Usulan Perbaikan</th><th>Terakhir Disimpan</th></tr>`;
   Object.entries(grup)
     .sort((a, b) => {
@@ -517,6 +538,18 @@ function renderDaftarPekerjaan() {
     })
     .forEach(([nama, g]) => {
       const pl = perluasan[nama];
+      // tahap & progres hanya untuk pekerjaan perluasan (punya tiang rencana)
+      let selTahap = '—';
+      if (pl) {
+        const kunciTahap = tahapPekerjaan(nama);
+        const st = STATUS_PEKERJAAN[kunciTahap];
+        const kontrol = bolehUbah
+          ? `<select data-pkj="${encodeURIComponent(nama)}" style="border-left:4px solid ${st.warna}">${
+              Object.entries(STATUS_PEKERJAAN).map(([k, s]) =>
+                `<option value="${k}" ${k === kunciTahap ? 'selected' : ''}>${s.nama} (${s.persen}%)</option>`).join('')}</select>`
+          : `<span class="badge-skor" style="background:${st.warna}">${st.nama} ${st.persen}%</span>`;
+        selTahap = `${kontrol}<div class="batang-progres" style="margin-top:4px"><div style="width:${st.persen}%;background:${st.warna}"></div></div>`;
+      }
       html += `<tr>
         <td><b>${nama}</b></td>
         <td>${[...g.ulp].join(', ') || '—'}</td>
@@ -526,12 +559,64 @@ function renderDaftarPekerjaan() {
           ? (pl.rute / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' km'
           : angka(pl.rute) + ' m') : '—'}</td>
         <td class="angka"><b>${pl ? angka(pl.biaya) : '—'}</b></td>
+        <td>${selTahap}</td>
         <td class="angka">${g.usulan ? `${g.usulan}${g.selesai ? ` (${g.selesai} selesai)` : ''} · ${angka(g.nilai)}` : '—'}</td>
         <td>${tglSingkat(g.terakhir)}</td></tr>`;
     });
   wadah.innerHTML = html + `</table>
     <p class="catatan-kecil">± RAB Perluasan = tiang + konstruksi + aksesoris + jasa tanam + perkiraan penghantar
     (AAAC 70 · 3 fasa · andongan 3%) + jasa tarik — RAB rinci resmi tetap dari aplikasi surveyor (🧾 RAB Resmi).</p>`;
+
+  // ubah tahap → tersimpan & tersinkron otomatis, timeline ikut segar
+  wadah.querySelectorAll('select[data-pkj]').forEach(sel => {
+    sel.onchange = () => {
+      const nama = decodeURIComponent(sel.dataset.pkj);
+      const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
+      pekerjaanStatus[nama] = { status: sel.value, diubah: Date.now(), oleh: sesi.petugas || '' };
+      renderDaftarPekerjaan(); renderTimeline();
+      toast(`⚡ "${nama}" → ${STATUS_PEKERJAAN[sel.value].nama}`);
+      kirimServer(true);
+    };
+  });
+}
+
+// ---------------- timeline pekerjaan perluasan ----------------
+// Batang waktu per pekerjaan: dari titik pertama disimpan s.d. aktivitas
+// terakhir, diwarnai sesuai tahapnya; garis merah = hari ini.
+function tglPendek(ts) {
+  return new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+function renderTimeline() {
+  const wadah = $('#d-timeline');
+  const perluasan = perluasanPerPekerjaan();
+  const entri = Object.entries(perluasan).filter(([, g]) => g.mulai);
+  if (!entri.length) {
+    wadah.innerHTML = '<p class="catatan-kecil">Belum ada pekerjaan perluasan untuk ditampilkan di timeline.</p>';
+    return;
+  }
+  const min = Math.min(...entri.map(([, g]) => g.mulai));
+  const maks = Math.max(...entri.map(([, g]) => g.akhir), Date.now());
+  const bentang = Math.max(maks - min, 864e5); // minimal 1 hari agar batang tidak degenerate
+  const posKini = Math.min(((Date.now() - min) / bentang) * 100, 100);
+
+  let html = `<div class="tl-sumbu"><span>${tglPendek(min)}</span>
+    <span style="color:#e53935">▼ hari ini</span><span>${tglPendek(maks)}</span></div>`;
+  entri.sort((a, b) => a[1].mulai - b[1].mulai).forEach(([nama, g]) => {
+    const st = STATUS_PEKERJAAN[tahapPekerjaan(nama)];
+    const kiri = ((g.mulai - min) / bentang) * 100;
+    const lebar = Math.max(((g.akhir - g.mulai) / bentang) * 100, 3);
+    html += `<div class="tl-baris">
+      <div class="tl-nama" title="${nama}">${nama}</div>
+      <div class="tl-rel">
+        <div class="tl-kini" style="left:${posKini}%"></div>
+        <div class="tl-bar" style="left:${Math.min(kiri, 97)}%;width:${lebar}%;background:${st.warna}"
+          title="${tglSingkat(g.mulai)} — ${tglSingkat(g.akhir)}">${st.nama} · ${st.persen}%</div>
+      </div>
+      <div class="tl-tgl">${tglPendek(g.mulai)} – ${tglPendek(g.akhir)}</div>
+    </div>`;
+  });
+  wadah.innerHTML = html;
 }
 
 // ---------------- monitoring per petugas & unit (ULP) ----------------
@@ -814,6 +899,7 @@ function renderSemua() {
   renderPeta();
   renderRingkasan();
   renderDaftarPekerjaan();
+  renderTimeline();
   renderMonitoringPetugas();
   renderTitikUsulan();
   renderTabelUsulan();
@@ -850,6 +936,7 @@ async function ambilServer() {
     const tugasBaru = gabungTugas(d.tugas);
     hargaTerpusat = d.harga || hargaTerpusat;
     riwayatHarga = Array.isArray(d.riwayatHarga) ? d.riwayatHarga : riwayatHarga;
+    gabungPekerjaanStatus(d.pekerjaanStatus);
     renderSemua();
     if (hasil.baru || hasil.diperbarui || tugasBaru) {
       toast(`🔄 Data unit tergabung: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui`
@@ -869,7 +956,7 @@ async function kirimServer(senyap) {
     const res = await fetch(server + '/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': unit },
-      body: JSON.stringify({ poles, koreksi, tugas }),
+      body: JSON.stringify({ poles, koreksi, tugas, pekerjaanStatus }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     if (!senyap) toast('✅ Perubahan tersinkron ke server unit');
