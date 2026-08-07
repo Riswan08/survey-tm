@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=46">
+  <link rel="stylesheet" href="css/style.css?v=47">
 </head>
 <body>
 
@@ -22,6 +22,7 @@
     <button class="tombol-bar" id="btn-daftar">📋 Tiang</button>
     <button class="tombol-bar" id="btn-tugas" title="Penugasan survey untuk Anda" style="position:relative">🗒️
       <span id="badge-tugas" class="badge-skor sembunyi" style="background:#e53935;position:absolute;top:-5px;right:-5px">0</span></button>
+    <button class="tombol-bar" id="btn-perluasan" title="Pekerjaan Perluasan JTM / JTR">⚡</button>
     <button class="tombol-bar" id="btn-rab">💰 RAB</button>
     <a class="tombol-bar" id="btn-dasbor" href="dasbor.html" title="Dasbor manajemen" style="text-decoration:none">📊</a>
     <button class="tombol-bar" id="btn-pengaturan">⚙️</button>
@@ -189,6 +190,22 @@
       </div>
       <div class="modal-kaki">
         <button class="tombol polos" data-tutup="modal-tugas">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: PEKERJAAN PERLUASAN JTM/JTR ===== -->
+  <div class="modal-latar" id="modal-perluasan">
+    <div class="modal">
+      <div class="modal-kepala">⚡ Pekerjaan Perluasan JTM / JTR
+        <button class="tutup" data-tutup="modal-perluasan">×</button></div>
+      <div class="modal-isi">
+        <p class="catatan-kecil" style="margin-bottom:10px">Semua pekerjaan perluasan di proyek ini — jumlah tiang
+          (JTM/JTR), panjang rute, perkiraan biaya, dan tahap dari dasbor. Ketuk 📍 untuk menuju lokasinya di peta.</p>
+        <div id="isi-perluasan"></div>
+      </div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-perluasan">Tutup</button>
       </div>
     </div>
   </div>
@@ -372,9 +389,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=46"></script>
-  <script src="js/app.js?v=46"></script>
-  <script src="js/masuk.js?v=46"></script>
+  <script src="js/data.js?v=47"></script>
+  <script src="js/app.js?v=47"></script>
+  <script src="js/masuk.js?v=47"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

@@ -2005,6 +2005,70 @@ function renderTugas() {
     });
 }
 
+// ---------------- PEKERJAAN PERLUASAN JTM/JTR (menu ⚡) ----------------
+// Daftar pekerjaan perluasan di proyek ini: tiang JTM/JTR, rute, perkiraan
+// biaya, dan tahap progres (dikelola di dasbor, diterima lewat sinkronisasi).
+const KUNCI_STATUS_PEKERJAAN = 'cakra_pekerjaan_status';
+let statusPekerjaanUnit = (() => {
+  try { return JSON.parse(localStorage.getItem(KUNCI_STATUS_PEKERJAAN)) || {}; } catch (e) { return {}; }
+})();
+
+function gabungStatusPekerjaanUnit(masuk) {
+  Object.entries(masuk || {}).forEach(([k, v]) => {
+    if (!v || typeof v !== 'object') return;
+    const ada = statusPekerjaanUnit[k];
+    if (!ada || (Number(v.diubah) || 0) > (Number(ada.diubah) || 0)) statusPekerjaanUnit[k] = v;
+  });
+  localStorage.setItem(KUNCI_STATUS_PEKERJAAN, JSON.stringify(statusPekerjaanUnit));
+}
+
+function renderPerluasan() {
+  const wadah = $('#isi-perluasan');
+  const grup = {};
+  polesRencana().forEach(p => {
+    const k = p.pekerjaan || '(tanpa nama pekerjaan)';
+    (grup[k] = grup[k] || []).push(p);
+  });
+  const semuaNama = Object.keys(grup);
+  if (!semuaNama.length) {
+    wadah.innerHTML = `<p class="catatan-kecil">Belum ada titik rencana di proyek ini. Isi
+      <b>Jenis & Nama Pekerjaan</b> di ⚙️ Pengaturan lalu mulai taging — pekerjaannya tampil di sini.</p>`;
+    return;
+  }
+  wadah.innerHTML = '';
+  semuaNama.forEach(nama => {
+    const daftar = grup[nama];
+    const jtr = daftar.filter(p => konstruksiTR(p.konstruksi)).length;
+    const jtm = daftar.length - jtr;
+    let rute = 0;
+    for (let i = 1; i < daftar.length; i++) {
+      const d = haversine(daftar[i - 1], daftar[i]);
+      if (d <= 2000) rute += d;
+    }
+    let biaya = 0;
+    daftar.forEach(p => { biaya += biayaPerTiang(p).total; });
+    const stKey = (statusPekerjaanUnit[nama] || {}).status;
+    const st = STATUS_PEKERJAAN[stKey] || STATUS_PEKERJAAN.survey;
+    const div = document.createElement('div');
+    div.className = 'item-tiang';
+    div.innerHTML = `
+      <div class="bulat" style="background:${st.warna}">${st.persen}%</div>
+      <div class="isi">
+        <div class="nm">${nama} <span class="badge-skor" style="background:${st.warna}">${st.nama}</span></div>
+        <div class="dt">🗼 ${daftar.length} tiang (JTM ${jtm} · JTR ${jtr}) ·
+          ${rute >= 1000 ? angka(rute / 1000, 2) + ' km' : angka(rute, 0) + ' m'} ·
+          ± ${rupiah(biaya)} <small>(belum termasuk penghantar)</small></div>
+      </div>
+      <div class="aksi"><button class="tombol utama kecil" data-a="peta">📍</button></div>`;
+    div.querySelector('[data-a=peta]').onclick = () => {
+      tutupModal('modal-perluasan');
+      map.fitBounds(daftar.map(p => [p.lat, p.lng]), { padding: [60, 60] });
+      toast(`📍 Lokasi pekerjaan: ${nama}`);
+    };
+    wadah.appendChild(div);
+  });
+}
+
 // ---------------- MASTER HARGA TERPUSAT (FR-15) ----------------
 // Server menyimpan satu paket harga override per unit. Perangkat menerapkan
 // paket itu bila stempelnya lebih baru dari milik sendiri; admin yang
@@ -2082,6 +2146,7 @@ async function ambilDariServer(senyap) {
     gabungKoreksi(d.koreksi);
     const tugasBaru = gabungTugas(d.tugas);
     simpanTugas(); perbaruiBadgeTugas();
+    gabungStatusPekerjaanUnit(d.pekerjaanStatus); // tahap pekerjaan dari dasbor
     const hargaBaru = terapkanHargaTerpusat(d.harga);
     simpan(); render();
     if (!senyap && state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
@@ -2880,6 +2945,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   $('#btn-rab').onclick = renderRAB;
   $('#btn-tugas').onclick = () => { renderTugas(); bukaModal('modal-tugas'); };
+  $('#btn-perluasan').onclick = () => { renderPerluasan(); bukaModal('modal-perluasan'); };
   perbaruiBadgeTugas();
   $('#btn-cari').onclick = togglePanelCari;
   $('#cari-tombol').onclick = jalankanPencarian;

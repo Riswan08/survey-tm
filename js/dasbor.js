@@ -434,6 +434,25 @@ function renderPeta() {
   edges.forEach(([a, b]) => segmen.push([[posisi.get(a).lat, posisi.get(a).lng], [posisi.get(b).lat, posisi.get(b).lng]]));
   if (segmen.length) L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerTitik);
 
+  // rute RENCANA PERLUASAN per pekerjaan (biru; JTR putus-putus) — lokasi
+  // pekerjaan langsung terlihat di peta monitoring
+  const grupRencana = {};
+  poles.filter(p => p.mode === 'rencana').forEach(p => {
+    const k = p.pekerjaan || '(tanpa nama pekerjaan)';
+    (grupRencana[k] = grupRencana[k] || []).push(p);
+  });
+  const trKahP = (p) => (KONSTRUKSI[p.konstruksi] || {}).grup === 'JTR';
+  Object.values(grupRencana).forEach(daftar => {
+    for (let i = 1; i < daftar.length; i++) {
+      const a = daftar[i - 1], b = daftar[i];
+      if (jarakM(a, b) > 2000) continue;
+      L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
+        color: '#1e88e5', weight: 3.5, opacity: .9,
+        dashArray: (trKahP(a) || trKahP(b)) ? '6 6' : null,
+      }).addTo(layerTitik);
+    }
+  });
+
   // marker aset bawaan: di layer terpisah, dibangun sekali, disembunyikan saat
   // yang tersurvey berubah / zoom jauh (level-of-detail)
   renderAsetDasbor(tersurvey);
@@ -576,7 +595,7 @@ function renderDaftarPekerjaan() {
         selTahap = `${kontrol}<div class="batang-progres" style="margin-top:4px"><div style="width:${st.persen}%;background:${st.warna}"></div></div>`;
       }
       html += `<tr>
-        <td><b>${nama}</b></td>
+        <td><b>${nama}</b>${pl ? ` <button class="tombol polos kecil" data-lokasi="${encodeURIComponent(nama)}" title="Lihat lokasi pekerjaan di peta">📍</button>` : ''}</td>
         <td>${[...g.ulp].join(', ') || '—'}</td>
         <td>${[...g.petugas].join(', ') || '—'}</td>
         <td class="angka">${pl
@@ -596,6 +615,18 @@ function renderDaftarPekerjaan() {
   wadah.innerHTML = html + `</table>
     <p class="catatan-kecil">± RAB Perluasan = tiang + konstruksi + aksesoris + jasa tanam + perkiraan penghantar
     (AAAC 70 · 3 fasa · andongan 3%) + jasa tarik — RAB rinci resmi tetap dari aplikasi surveyor (🧾 RAB Resmi).</p>`;
+
+  // 📍 menuju lokasi pekerjaan di peta
+  wadah.querySelectorAll('[data-lokasi]').forEach(b => {
+    b.onclick = () => {
+      const nama = decodeURIComponent(b.dataset.lokasi);
+      const titik = poles.filter(p => p.mode === 'rencana' && (p.pekerjaan || '(tanpa nama pekerjaan)') === nama);
+      if (!titik.length) return;
+      peta.fitBounds(titik.map(p => [p.lat, p.lng]), { padding: [60, 60] });
+      document.querySelector('#peta-dasbor').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast(`📍 Lokasi "${nama}" — garis biru di peta (putus-putus = JTR)`);
+    };
+  });
 
   // ubah tahap → tersimpan & tersinkron otomatis, timeline ikut segar
   wadah.querySelectorAll('select[data-pkj]').forEach(sel => {
