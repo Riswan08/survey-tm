@@ -511,13 +511,19 @@ function renderDaftarPekerjaan() {
   poles.forEach(p => {
     const kunci = p.pekerjaan || '(tanpa nama pekerjaan)';
     const g = grup[kunci] = grup[kunci] ||
-      { titik: 0, usulan: 0, selesai: 0, nilai: 0, petugas: new Set(), ulp: new Set(), terakhir: 0 };
+      { titik: 0, usulan: 0, selesai: 0, nilai: 0, pelanggan: 0, evidenLengkap: 0,
+        petugas: new Set(), ulp: new Set(), terakhir: 0 };
     g.titik++;
     (p.usulan || []).forEach(u => {
       g.usulan++;
       if (u.status === 'selesai') g.selesai++;
       g.nilai += biayaPaket(u.paket).total;
     });
+    if (p.mode === 'pelanggan') {
+      g.pelanggan++;
+      const f = p.fotoPelanggan || {};
+      if (Object.keys(EVIDEN_PELANGGAN).every(k => f[k])) g.evidenLengkap++;
+    }
     if (p.petugas) g.petugas.add(p.petugas);
     if (p.ulp) g.ulp.add(p.ulp);
     if ((p.diubah || 0) > g.terakhir) g.terakhir = p.diubah;
@@ -529,6 +535,7 @@ function renderDaftarPekerjaan() {
     <th>Nama Pekerjaan</th><th>Unit</th><th>Petugas</th>
     <th class="angka">Tiang Rencana</th><th class="angka">Rute</th><th class="angka">± RAB Perluasan (Rp)</th>
     <th style="min-width:150px">Tahap &amp; Progres</th>
+    <th class="angka">Calon Pelanggan</th>
     <th class="angka">Usulan Perbaikan</th><th>Terakhir Disimpan</th></tr>`;
   Object.entries(grup)
     .sort((a, b) => {
@@ -560,6 +567,9 @@ function renderDaftarPekerjaan() {
           : angka(pl.rute) + ' m') : '—'}</td>
         <td class="angka"><b>${pl ? angka(pl.biaya) : '—'}</b></td>
         <td>${selTahap}</td>
+        <td class="angka">${g.pelanggan
+          ? `<b style="color:#7b1fa2">${g.pelanggan}</b><br><small>${g.evidenLengkap} eviden lengkap</small>`
+          : '—'}</td>
         <td class="angka">${g.usulan ? `${g.usulan}${g.selesai ? ` (${g.selesai} selesai)` : ''} · ${angka(g.nilai)}` : '—'}</td>
         <td>${tglSingkat(g.terakhir)}</td></tr>`;
     });
