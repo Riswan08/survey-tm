@@ -209,11 +209,25 @@ function rapikanKodeUnit(v) {
   return String(v || '').trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
 
+// halaman HTTPS (github.io) DILARANG browser menghubungi server HTTP lokal
+// (mixed content) — solusinya: buka aplikasi dari alamat server itu sendiri
+function campuranTerblokir() {
+  return location.protocol === 'https:' && urlServer().startsWith('http://');
+}
+
+function pesanCampuran() {
+  return `🔴 Browser memblokir: aplikasi ini dibuka lewat HTTPS (${location.host}) sehingga TIDAK BISA `
+    + `menghubungi server HTTP lokal. Buka aplikasi dari ${urlServer()}/ (server juga menyajikan `
+    + `aplikasi yang sama) — sinkronisasi langsung jalan.`;
+}
+
 function perbaruiStatusSinkron() {
   const el = $('#s-status-sinkron');
   if (!el) return;
   if (!urlServer() || !state.settings.kodeUnit) {
     el.textContent = '⚪ Sinkron otomatis nonaktif — isi alamat server & kode unit lalu Simpan.';
+  } else if (campuranTerblokir()) {
+    el.textContent = pesanCampuran();
   } else if (navigator.onLine === false) {
     el.textContent = '🟡 Offline — perubahan aman di HP, terkirim sendiri begitu online.';
   } else {
@@ -223,7 +237,7 @@ function perbaruiStatusSinkron() {
 }
 
 function sinkronSiap() {
-  return !!(urlServer() && state.settings.kodeUnit) && navigator.onLine !== false;
+  return !!(urlServer() && state.settings.kodeUnit) && navigator.onLine !== false && !campuranTerblokir();
 }
 
 function jadwalkanSinkronOtomatis() {
@@ -2027,6 +2041,7 @@ function urlServer() {
 async function kirimKeServer(senyap) {
   const url = urlServer();
   if (!url || !state.settings.kodeUnit) { if (!senyap) toast('Isi alamat server & kode unit dulu'); return; }
+  if (campuranTerblokir()) { if (!senyap) toast(pesanCampuran()); return; }
   if (!senyap) toast('⬆️ Mengirim data ke server…');
   try {
     const res = await fetch(url + '/api/sync', {
@@ -2051,6 +2066,7 @@ async function kirimKeServer(senyap) {
 async function ambilDariServer(senyap) {
   const url = urlServer();
   if (!url || !state.settings.kodeUnit) { if (!senyap) toast('Isi alamat server & kode unit dulu'); return; }
+  if (campuranTerblokir()) { if (!senyap) toast(pesanCampuran()); return; }
   if (!senyap) toast('⬇️ Mengambil data dari server…');
   try {
     const res = await fetch(url + '/api/data', {
