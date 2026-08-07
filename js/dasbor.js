@@ -67,6 +67,7 @@ function rapikan(p, i) {
     }).filter(Boolean),
     foto: (Array.isArray(p.foto) ? p.foto : []).filter(f => typeof f === 'string' && f.startsWith('data:image')).slice(0, 3),
     petugas: typeof p.petugas === 'string' ? p.petugas.slice(0, 40) : '',
+    ulp: typeof p.ulp === 'string' ? p.ulp.slice(0, 40) : '',
     catatan: typeof p.catatan === 'string' ? p.catatan.slice(0, 300) : '',
     diubah: isFinite(p.diubah) ? Number(p.diubah) : 0,
     sambung: Array.isArray(p.sambung) ? p.sambung.filter(s => typeof s === 'string' && s.length >= 3).slice(0, 8) : [],
@@ -417,6 +418,62 @@ function renderRingkasan() {
   $('#d-ringkasan').innerHTML = html;
 }
 
+// ---------------- monitoring per petugas & unit (ULP) ----------------
+// Rekap semua usulan pekerjaan dari seluruh petugas, dikelompokkan per unit:
+// jumlah titik, usulan per status, nilai, dan batang progres penyelesaian.
+function renderMonitoringPetugas() {
+  const wadah = $('#d-monitoring');
+  const eksisting = poles.filter(p => p.mode === 'eksisting');
+  if (!poles.length) {
+    wadah.innerHTML = '<p class="catatan-kecil">Belum ada data survey.</p>';
+    return;
+  }
+
+  // grup[ulp][petugas] = { titik, usulan: {status: n}, nilai }
+  const grup = {};
+  poles.forEach(p => {
+    const ulp = p.ulp || '(tanpa unit)';
+    const ptg = p.petugas || '(tanpa nama)';
+    grup[ulp] = grup[ulp] || {};
+    const g = grup[ulp][ptg] = grup[ulp][ptg] ||
+      { titik: 0, usulan: { diusulkan: 0, disetujui: 0, dikerjakan: 0, selesai: 0 }, nilai: 0 };
+    g.titik++;
+    (p.usulan || []).forEach(u => {
+      if (g.usulan[u.status] === undefined) return;
+      g.usulan[u.status]++;
+      g.nilai += biayaPaket(u.paket).total;
+    });
+  });
+
+  let html = '';
+  Object.keys(grup).sort().forEach(ulp => {
+    const petugasUnit = grup[ulp];
+    const totalUnit = Object.values(petugasUnit).reduce((a, g) => {
+      a.titik += g.titik; a.nilai += g.nilai;
+      Object.keys(a.usulan).forEach(s => { a.usulan[s] += g.usulan[s]; });
+      return a;
+    }, { titik: 0, nilai: 0, usulan: { diusulkan: 0, disetujui: 0, dikerjakan: 0, selesai: 0 } });
+    const totU = Object.values(totalUnit.usulan).reduce((a, b) => a + b, 0);
+
+    html += `<div class="judul-seksi" style="margin-top:10px">🏢 ${ulp} — ${totalUnit.titik} titik · ${totU} usulan · ${rupiah(totalUnit.nilai)}</div>
+      <table class="rab"><tr><th>Petugas</th><th class="angka">Titik</th>
+        ${Object.values(STATUS_USULAN).map(s => `<th class="angka">${s.nama}</th>`).join('')}
+        <th class="angka">Nilai Usulan</th><th style="min-width:120px">Progres Selesai</th></tr>`;
+    Object.keys(petugasUnit).sort().forEach(ptg => {
+      const g = petugasUnit[ptg];
+      const jml = Object.values(g.usulan).reduce((a, b) => a + b, 0);
+      const persen = jml ? Math.round(g.usulan.selesai / jml * 100) : 0;
+      html += `<tr><td><b>${ptg}</b></td><td class="angka">${g.titik}</td>
+        ${Object.keys(STATUS_USULAN).map(s => `<td class="angka">${g.usulan[s] || ''}</td>`).join('')}
+        <td class="angka">${g.nilai ? angka(g.nilai) : ''}</td>
+        <td><div class="batang-progres"><div style="width:${persen}%"></div></div>
+          <small>${jml ? `${g.usulan.selesai}/${jml} (${persen}%)` : 'belum ada usulan'}</small></td></tr>`;
+    });
+    html += '</table>';
+  });
+  wadah.innerHTML = html || '<p class="catatan-kecil">Belum ada data survey.</p>';
+}
+
 function renderTabelUsulan() {
   const fStatus = $('#d-filter-status').value;
   const fJenis = $('#d-filter-jenis').value;
@@ -635,6 +692,7 @@ async function jalankanPencarian() {
 function renderSemua() {
   renderPeta();
   renderRingkasan();
+  renderMonitoringPetugas();
   renderTitikUsulan();
   renderTabelUsulan();
   renderTabelPelanggan();
@@ -722,13 +780,31 @@ function muatDataLokal() {
   return baru + ubah;
 }
 
-// pengaturan server dari aplikasi survey ikut dipakai dasbor (satu kali isi saja)
+// pengaturan server dari aplikasi survey ikut dipakai dasbor (satu kali isi saja) —
+// dibaca dari PROYEK AKTIF; kalau kosong, dicari di proyek lain
 function ambilCfgAplikasi() {
+  const kunciSemua = ['survey_tm_v1'];
+  let kunciAktif = 'survey_tm_v1';
   try {
-    const d = JSON.parse(localStorage.getItem('survey_tm_v1'));
-    const s = (d && d.settings) || {};
-    return { server: s.server || '', unit: s.kodeUnit || '' };
-  } catch (e) { return { server: '', unit: '' }; }
+    const reg = JSON.parse(localStorage.getItem('cakra_proyek'));
+    (reg && Array.isArray(reg.daftar) ? reg.daftar : []).forEach(p => {
+      if (p && typeof p.id === 'string' && p.id !== 'utama') kunciSemua.push('survey_tm_v1_' + p.id);
+    });
+    if (reg && reg.aktif && reg.aktif !== 'utama') kunciAktif = 'survey_tm_v1_' + reg.aktif;
+  } catch (e) { /* tanpa registry — cukup kunci utama */ }
+  const baca = (k) => {
+    try {
+      const s = (JSON.parse(localStorage.getItem(k)) || {}).settings || {};
+      return { server: s.server || '', unit: s.kodeUnit || '' };
+    } catch (e) { return { server: '', unit: '' }; }
+  };
+  const aktif = baca(kunciAktif);
+  if (aktif.server && aktif.unit) return aktif;
+  for (const k of kunciSemua) {
+    const c = baca(k);
+    if (c.server && c.unit) return c;
+  }
+  return aktif;
 }
 
 // ---------------- init ----------------
@@ -738,6 +814,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // data survey perangkat ini tampil otomatis; server unit digabung otomatis di latar belakang
   muatDataLokal();
   ambilServer();
+  // monitoring langsung: dasbor menyegarkan diri dari server tiap 60 detik
+  setInterval(() => { muatDataLokal(); ambilServer(); }, 60000);
 
   // segarkan otomatis saat kembali ke tab dasbor / aplikasi menyimpan data baru
   window.addEventListener('focus', () => { if (muatDataLokal()) renderSemua(); });

@@ -187,6 +187,24 @@ function simpan() {
   } catch (e) {
     toast('⚠️ Penyimpanan HP hampir penuh — hapus sebagian foto atau ekspor proyek ke JSON');
   }
+  jadwalkanSinkronOtomatis(); // setiap pekerjaan/usulan langsung mengalir ke database unit
+}
+
+// ---------------- SINKRONISASI OTOMATIS ----------------
+// Offline-first tetap: data selalu tersimpan di perangkat dulu. Bila alamat
+// server & kode unit terisi dan perangkat online, setiap perubahan dikirim
+// otomatis (senyap, dijeda 4 dtk) — pekerjaan & usulan langsung terbaca di
+// database unit untuk monitoring, tanpa tombol kirim/unduh manual.
+let timerSinkron = null;
+
+function sinkronSiap() {
+  return !!(urlServer() && state.settings.kodeUnit) && navigator.onLine !== false;
+}
+
+function jadwalkanSinkronOtomatis() {
+  if (!sinkronSiap()) return;
+  clearTimeout(timerSinkron);
+  timerSinkron = setTimeout(() => kirimKeServer(true), 4000);
 }
 
 // --- validasi data: apa pun isi localStorage / file impor, state selalu sehat ---
@@ -226,6 +244,7 @@ function normalisasiPole(p, indeks) {
     // identitas sinkronisasi
     uid: (typeof p.uid === 'string' && p.uid.length >= 3) ? p.uid.slice(0, 40) : `${DEVICE_ID}-${p.id || indeks + 1}-${indeks}`,
     petugas: typeof p.petugas === 'string' ? p.petugas.slice(0, 40) : '',
+    ulp: typeof p.ulp === 'string' ? p.ulp.slice(0, 40) : '',
     diubah: isFinite(p.diubah) ? Number(p.diubah) : 0,
     // sambungan jaringan eksisting: uid tiang tetangga (garis kabel di peta)
     sambung: Array.isArray(p.sambung) ? p.sambung.filter(s => typeof s === 'string' && s.length >= 3).slice(0, 8) : [],
@@ -1240,6 +1259,8 @@ function perbaruiPratinjauBiaya() {
 function stempel(p, uidLama) {
   p.uid = uidLama || `${DEVICE_ID}-${p.id}`;
   p.petugas = state.settings.petugas || '';
+  const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
+  p.ulp = sesi.ulp || p.ulp || ''; // unit pembuat — dipakai monitoring per ULP di dasbor
   p.diubah = Date.now();
   return p;
 }
@@ -1971,10 +1992,10 @@ function urlServer() {
   return (state.settings.server || '').trim().replace(/\/+$/, '');
 }
 
-async function kirimKeServer() {
+async function kirimKeServer(senyap) {
   const url = urlServer();
-  if (!url || !state.settings.kodeUnit) { toast('Isi alamat server & kode unit dulu'); return; }
-  toast('⬆️ Mengirim data ke server…');
+  if (!url || !state.settings.kodeUnit) { if (!senyap) toast('Isi alamat server & kode unit dulu'); return; }
+  if (!senyap) toast('⬆️ Mengirim data ke server…');
   try {
     const res = await fetch(url + '/api/sync', {
       method: 'POST',
@@ -1986,17 +2007,18 @@ async function kirimKeServer() {
     });
     if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
     const d = await res.json();
-    toast(`✅ Terkirim — server kini menyimpan ${d.total} titik unit ini`
+    if (!senyap) toast(`✅ Terkirim — server kini menyimpan ${d.total} titik unit ini`
       + (d.hargaBerubah ? ' · harga terpusat diperbarui' : ''));
   } catch (e) {
-    toast('Gagal kirim: ' + (e.message || 'server tidak terjangkau'));
+    // sinkron otomatis diam saat offline/gagal — data aman di perangkat, dicoba lagi nanti
+    if (!senyap) toast('Gagal kirim: ' + (e.message || 'server tidak terjangkau'));
   }
 }
 
-async function ambilDariServer() {
+async function ambilDariServer(senyap) {
   const url = urlServer();
-  if (!url || !state.settings.kodeUnit) { toast('Isi alamat server & kode unit dulu'); return; }
-  toast('⬇️ Mengambil data dari server…');
+  if (!url || !state.settings.kodeUnit) { if (!senyap) toast('Isi alamat server & kode unit dulu'); return; }
+  if (!senyap) toast('⬇️ Mengambil data dari server…');
   try {
     const res = await fetch(url + '/api/data', {
       headers: { 'X-Kode-Unit': state.settings.kodeUnit },
@@ -2009,12 +2031,15 @@ async function ambilDariServer() {
     simpanTugas(); perbaruiBadgeTugas();
     const hargaBaru = terapkanHargaTerpusat(d.harga);
     simpan(); render();
-    if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
-    toast(`✅ Tergabung: ${hasil.baru} titik baru, ${hasil.diperbarui} diperbarui (total ${hasil.total})`
-      + (tugasBaru ? ` · ${tugasBaru} tugas baru` : '')
-      + (hargaBaru ? ' · 💰 harga terpusat unit diterapkan' : ''));
+    if (!senyap && state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
+    const adaPerubahan = hasil.baru || hasil.diperbarui || tugasBaru || hargaBaru;
+    if (!senyap || adaPerubahan) {
+      toast(`${senyap ? '🔄' : '✅'} Tergabung: ${hasil.baru} titik baru, ${hasil.diperbarui} diperbarui (total ${hasil.total})`
+        + (tugasBaru ? ` · ${tugasBaru} tugas baru` : '')
+        + (hargaBaru ? ' · 💰 harga terpusat unit diterapkan' : ''));
+    }
   } catch (e) {
-    toast('Gagal ambil: ' + (e.message || 'server tidak terjangkau'));
+    if (!senyap) toast('Gagal ambil: ' + (e.message || 'server tidak terjangkau'));
   }
 }
 
@@ -2781,6 +2806,13 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('online', badgeOffline);
   window.addEventListener('offline', badgeOffline);
   badgeOffline();
+
+  // sinkron otomatis: tarik data unit saat aplikasi dibuka & saat kembali online,
+  // perubahan lokal terkirim sendiri lewat jadwalkanSinkronOtomatis (dipicu simpan)
+  if (sinkronSiap()) setTimeout(() => ambilDariServer(true), 1200);
+  window.addEventListener('online', () => {
+    if (sinkronSiap()) { ambilDariServer(true); jadwalkanSinkronOtomatis(); }
+  });
   render();
   if (state.poles.length) map.fitBounds(state.poles.map(p => [p.lat, p.lng]), { padding: [40, 40] });
   muatAsetStatis(); // lapisan aset TM bawaan
