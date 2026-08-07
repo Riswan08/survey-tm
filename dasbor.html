@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=41">
+  <link rel="stylesheet" href="css/style.css?v=42">
   <style>
     /* tata letak khusus dasbor: halaman menggulir, peta di panel */
     body { overflow: auto; background: var(--abu); }
@@ -69,14 +69,23 @@
   <div id="isi-dasbor">
 
     <div class="panel">
-      <div class="judul-seksi">Ringkasan</div>
+      <div class="judul-seksi">Ringkasan Keseluruhan</div>
+      <p class="catatan-kecil" id="d-terakhir"></p>
       <div class="kartu-baris" id="d-ringkasan"></div>
     </div>
 
     <div class="panel">
-      <div class="judul-seksi">📊 Monitoring Usulan &amp; Progres per Petugas — sesuai Unit</div>
-      <p class="catatan-kecil">Semua pekerjaan yang dibuat &amp; diusulkan seluruh petugas terbaca otomatis dari database unit
-        (tersinkron langsung dari aplikasi, disegarkan tiap menit).</p>
+      <div class="judul-seksi">📋 Daftar Pekerjaan yang Masuk</div>
+      <p class="catatan-kecil">Setiap pekerjaan survey yang <b>disimpan petugas</b> otomatis muncul di sini —
+        lengkap dengan siapa yang mengerjakan, berapa titik &amp; usulannya, dan <b>kapan terakhir disimpan</b>.
+        Urutan dari yang terbaru.</p>
+      <div class="bungkus-tabel" id="d-pekerjaan"></div>
+    </div>
+
+    <div class="panel">
+      <div class="judul-seksi">📊 Kinerja per Petugas — dikelompokkan per Unit (ULP)</div>
+      <p class="catatan-kecil">Berapa titik yang sudah disurvey tiap petugas, berapa usulan perbaikannya di tiap
+        tahap (Diusulkan → Disetujui → Dikerjakan → Selesai), nilainya, dan batang hijau = persentase yang sudah selesai.</p>
       <div class="bungkus-tabel" id="d-monitoring"></div>
     </div>
 
@@ -101,7 +110,7 @@
     </div>
 
     <div class="panel">
-      <div class="judul-seksi">🗒️ Penugasan Survey (FR-16)</div>
+      <div class="judul-seksi">🗒️ Penugasan Survey — perintah kerja untuk surveyor</div>
       <p class="catatan-kecil sembunyi" id="t-ket-peran">Masuk dengan kode perencana/manajer untuk membuat &amp; mengelola tugas.</p>
       <div id="t-form">
         <div class="baris-alat" style="margin-bottom:8px">
@@ -121,12 +130,12 @@
     </div>
 
     <div class="panel">
-      <div class="judul-seksi">💰 Master Harga Terpusat (FR-15)</div>
+      <div class="judul-seksi">💰 Harga Satuan Terpusat — satu harga untuk semua perangkat</div>
       <div id="d-harga-info"></div>
     </div>
 
     <div class="panel">
-      <div class="judul-seksi">Usulan Perbaikan — Tindak Lanjut</div>
+      <div class="judul-seksi">✅ Tindak Lanjut Usulan Perbaikan — ubah status di kolom paling kanan</div>
       <div class="baris-alat" style="margin-bottom:10px">
         <select id="d-filter-status"><option value="">Semua status</option></select>
         <select id="d-filter-jenis"><option value="">Semua jenis aset</option></select>
@@ -141,8 +150,8 @@
   <div id="lightbox"><img alt="eviden"><div class="ket"></div></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=41"></script>
-  <script src="js/dasbor.js?v=41"></script>
-  <script src="js/masuk.js?v=41"></script>
+  <script src="js/data.js?v=42"></script>
+  <script src="js/dasbor.js?v=42"></script>
+  <script src="js/masuk.js?v=42"></script>
 </body>
 </html>

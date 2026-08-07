@@ -284,6 +284,7 @@ function normalisasiPole(p, indeks) {
     uid: (typeof p.uid === 'string' && p.uid.length >= 3) ? p.uid.slice(0, 40) : `${DEVICE_ID}-${p.id || indeks + 1}-${indeks}`,
     petugas: typeof p.petugas === 'string' ? p.petugas.slice(0, 40) : '',
     ulp: typeof p.ulp === 'string' ? p.ulp.slice(0, 40) : '',
+    pekerjaan: typeof p.pekerjaan === 'string' ? p.pekerjaan.slice(0, 100) : '',
     diubah: isFinite(p.diubah) ? Number(p.diubah) : 0,
     // sambungan jaringan eksisting: uid tiang tetangga (garis kabel di peta)
     sambung: Array.isArray(p.sambung) ? p.sambung.filter(s => typeof s === 'string' && s.length >= 3).slice(0, 8) : [],
@@ -1300,6 +1301,9 @@ function stempel(p, uidLama) {
   p.petugas = state.settings.petugas || '';
   const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
   p.ulp = sesi.ulp || p.ulp || ''; // unit pembuat — dipakai monitoring per ULP di dasbor
+  // nama pekerjaan proyek ini ikut tercatat di titik — tampil di dasbor monitoring
+  const s = state.settings;
+  p.pekerjaan = (`${JENIS_PEKERJAAN[s.jenisPekerjaan] || ''}${s.namaPekerjaan ? ' — ' + s.namaPekerjaan : ''}`).trim().slice(0, 100);
   p.diubah = Date.now();
   return p;
 }

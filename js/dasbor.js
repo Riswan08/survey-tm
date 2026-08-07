@@ -68,6 +68,7 @@ function rapikan(p, i) {
     foto: (Array.isArray(p.foto) ? p.foto : []).filter(f => typeof f === 'string' && f.startsWith('data:image')).slice(0, 3),
     petugas: typeof p.petugas === 'string' ? p.petugas.slice(0, 40) : '',
     ulp: typeof p.ulp === 'string' ? p.ulp.slice(0, 40) : '',
+    pekerjaan: typeof p.pekerjaan === 'string' ? p.pekerjaan.slice(0, 100) : '',
     catatan: typeof p.catatan === 'string' ? p.catatan.slice(0, 300) : '',
     diubah: isFinite(p.diubah) ? Number(p.diubah) : 0,
     sambung: Array.isArray(p.sambung) ? p.sambung.filter(s => typeof s === 'string' && s.length >= 3).slice(0, 8) : [],
@@ -418,6 +419,56 @@ function renderRingkasan() {
   $('#d-ringkasan').innerHTML = html;
 }
 
+// ---------------- daftar pekerjaan yang masuk ----------------
+// Setiap titik mencatat nama pekerjaannya + waktu disimpan — di sini
+// direkap per pekerjaan supaya pemantau langsung tahu apa saja yang masuk.
+function tglSingkat(ts) {
+  return ts ? new Date(ts).toLocaleString('id-ID', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }) : '—';
+}
+
+function renderDaftarPekerjaan() {
+  const wadah = $('#d-pekerjaan');
+  if (!poles.length) {
+    wadah.innerHTML = '<p class="catatan-kecil">Belum ada pekerjaan yang masuk.</p>';
+    return;
+  }
+  const grup = {};
+  poles.forEach(p => {
+    const kunci = p.pekerjaan || '(tanpa nama pekerjaan)';
+    const g = grup[kunci] = grup[kunci] ||
+      { titik: 0, usulan: 0, selesai: 0, nilai: 0, petugas: new Set(), ulp: new Set(), terakhir: 0 };
+    g.titik++;
+    (p.usulan || []).forEach(u => {
+      g.usulan++;
+      if (u.status === 'selesai') g.selesai++;
+      g.nilai += biayaPaket(u.paket).total;
+    });
+    if (p.petugas) g.petugas.add(p.petugas);
+    if (p.ulp) g.ulp.add(p.ulp);
+    if ((p.diubah || 0) > g.terakhir) g.terakhir = p.diubah;
+  });
+
+  let html = `<table class="rab"><tr>
+    <th>Nama Pekerjaan</th><th>Unit</th><th>Petugas</th>
+    <th class="angka">Titik</th><th class="angka">Usulan</th><th class="angka">Nilai Usulan (Rp)</th>
+    <th>Terakhir Disimpan</th></tr>`;
+  Object.entries(grup)
+    .sort((a, b) => b[1].terakhir - a[1].terakhir) // yang terbaru di atas
+    .forEach(([nama, g]) => {
+      html += `<tr>
+        <td><b>${nama}</b></td>
+        <td>${[...g.ulp].join(', ') || '—'}</td>
+        <td>${[...g.petugas].join(', ') || '—'}</td>
+        <td class="angka">${g.titik}</td>
+        <td class="angka">${g.usulan ? `${g.usulan}${g.selesai ? ` (${g.selesai} selesai)` : ''}` : '—'}</td>
+        <td class="angka">${g.nilai ? angka(g.nilai) : '—'}</td>
+        <td>${tglSingkat(g.terakhir)}</td></tr>`;
+    });
+  wadah.innerHTML = html + '</table>';
+}
+
 // ---------------- monitoring per petugas & unit (ULP) ----------------
 // Rekap semua usulan pekerjaan dari seluruh petugas, dikelompokkan per unit:
 // jumlah titik, usulan per status, nilai, dan batang progres penyelesaian.
@@ -491,7 +542,7 @@ function renderTabelUsulan() {
   const bolehUbah = typeof bolehKelolaUsulan === 'function' && bolehKelolaUsulan();
   let html = `<table class="rab"><tr>
     <th>Prioritas</th><th>Aset</th><th>Jenis</th><th>Kondisi</th><th>Paket Perbaikan</th>
-    <th class="angka">Biaya</th><th>Petugas</th><th>Status</th></tr>`;
+    <th>Pekerjaan</th><th class="angka">Biaya</th><th>Petugas</th><th>Disimpan</th><th>Status</th></tr>`;
   daftar.forEach((u, i) => {
     const st = STATUS_USULAN[u.entri.status] || STATUS_USULAN.diusulkan;
     const selStatus = bolehUbah
@@ -505,8 +556,10 @@ function renderTabelUsulan() {
       <td>${(JENIS_ASET[u.pole.jenisAset] || {}).nama || ''}</td>
       <td>${(KONDISI[u.pole.kondisi] || {}).nama || ''}</td>
       <td>${(PAKET_PERBAIKAN[u.entri.paket] || {}).nama || u.entri.paket}</td>
+      <td>${u.pole.pekerjaan || '—'}</td>
       <td class="angka">${angka(u.total)}</td>
       <td>${u.pole.petugas || '—'}</td>
+      <td style="white-space:nowrap">${tglSingkat(u.pole.diubah)}</td>
       <td>${selStatus}</td>
     </tr>`;
   });
@@ -690,8 +743,12 @@ async function jalankanPencarian() {
 }
 
 function renderSemua() {
+  const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const el = $('#d-terakhir');
+  if (el) el.textContent = `Data per pukul ${jam} — menyegarkan sendiri tiap menit`;
   renderPeta();
   renderRingkasan();
+  renderDaftarPekerjaan();
   renderMonitoringPetugas();
   renderTitikUsulan();
   renderTabelUsulan();
