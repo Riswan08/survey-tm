@@ -356,6 +356,9 @@ const DAMPAK = {
 
 const BOBOT_KONDISI = { baik: 1, rusakRingan: 2, rusakBerat: 3 };
 
+// daftar ULP UP3 Masohi — pilihan lokasi pekerjaan di Identitas Pekerjaan
+const DAFTAR_ULP = ['ULP Bula', 'ULP Kobisonta', 'ULP Masohi', 'ULP Piru', 'ULP Kairatu'];
+
 // jenis pekerjaan — identitas proyek survey, tampil di RAB & ekspor
 const JENIS_PEKERJAAN = {
   PERLUASAN_JTM:  'Perluasan Jaringan JTM',
@@ -469,6 +472,7 @@ const DEFAULT_SETTINGS = {
   akurasiMin: 15,           // meter — di atas ini muncul konfirmasi sebelum tikor dipakai
   jenisPekerjaan: 'PERLUASAN_JTM',  // identitas pekerjaan survey ini
   namaPekerjaan: '',                // mis. "Perluasan Dusun Waraka"
+  lokasiUlp: '',                    // lokasi pekerjaan (ULP) — tercatat di tiap titik
   // sinkronisasi terpusat (M4) — kosongkan jika bekerja mandiri/offline saja
   server: '',               // mis. http://192.168.1.10:8787 (server CAKRA internal unit)
   kodeUnit: '',             // kode unit = kunci akses data bersama

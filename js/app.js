@@ -353,6 +353,7 @@ function normalisasiState(d) {
   if (isFinite(s.akurasiMin) && s.akurasiMin >= 1 && s.akurasiMin <= 500) hasil.settings.akurasiMin = Number(s.akurasiMin);
   if (JENIS_PEKERJAAN[s.jenisPekerjaan]) hasil.settings.jenisPekerjaan = s.jenisPekerjaan;
   if (typeof s.namaPekerjaan === 'string') hasil.settings.namaPekerjaan = s.namaPekerjaan.slice(0, 80);
+  if (DAFTAR_ULP.includes(s.lokasiUlp)) hasil.settings.lokasiUlp = s.lokasiUlp;
   if (typeof s.server === 'string') hasil.settings.server = s.server.slice(0, 200);
   if (typeof s.kodeUnit === 'string') hasil.settings.kodeUnit = s.kodeUnit.slice(0, 60);
   if (typeof s.petugas === 'string') hasil.settings.petugas = s.petugas.slice(0, 40);
@@ -1296,14 +1297,19 @@ function perbaruiPratinjauBiaya() {
      Total titik ini: <b>${rupiah(b.total)}</b>`;
 }
 
+// label pekerjaan proyek: "Jenis — Nama/Lokasi" (tampil di dasbor monitoring)
+function labelPekerjaan(s) {
+  s = s || state.settings;
+  return (`${JENIS_PEKERJAAN[s.jenisPekerjaan] || ''}${s.namaPekerjaan ? ' — ' + s.namaPekerjaan : ''}`).trim().slice(0, 100);
+}
+
 function stempel(p, uidLama) {
   p.uid = uidLama || `${DEVICE_ID}-${p.id}`;
   p.petugas = state.settings.petugas || '';
   const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
-  p.ulp = sesi.ulp || p.ulp || ''; // unit pembuat — dipakai monitoring per ULP di dasbor
-  // nama pekerjaan proyek ini ikut tercatat di titik — tampil di dasbor monitoring
-  const s = state.settings;
-  p.pekerjaan = (`${JENIS_PEKERJAAN[s.jenisPekerjaan] || ''}${s.namaPekerjaan ? ' — ' + s.namaPekerjaan : ''}`).trim().slice(0, 100);
+  // lokasi pekerjaan (ULP) dari Identitas Pekerjaan; kalau kosong ikut ULP sesi login
+  p.ulp = state.settings.lokasiUlp || sesi.ulp || p.ulp || '';
+  p.pekerjaan = labelPekerjaan();
   p.diubah = Date.now();
   return p;
 }
@@ -1783,6 +1789,11 @@ function renderPengaturan() {
   $('#s-jenis-pekerjaan').innerHTML = Object.entries(JENIS_PEKERJAAN)
     .map(([kode, nama]) => `<option value="${kode}" ${kode === s.jenisPekerjaan ? 'selected' : ''}>${nama}</option>`).join('');
   $('#s-nama-pekerjaan').value = s.namaPekerjaan || '';
+  // lokasi pekerjaan (ULP) — bila belum dipilih, ikut ULP sesi login
+  const sesiUlp = ((typeof sesiCakra === 'function' && sesiCakra()) || {}).ulp || '';
+  const ulpTerpilih = s.lokasiUlp || (DAFTAR_ULP.includes(sesiUlp) ? sesiUlp : '');
+  $('#s-lokasi-ulp').innerHTML = '<option value="">— pilih ULP —</option>' + DAFTAR_ULP
+    .map(u => `<option value="${u}" ${u === ulpTerpilih ? 'selected' : ''}>${u}</option>`).join('');
   $('#s-petugas').value = s.petugas || '';
   $('#s-server').value = s.server || '';
   $('#s-unit').value = s.kodeUnit || '';
@@ -1822,6 +1833,8 @@ function renderPengaturan() {
 
 function simpanPengaturan() {
   const s = state.settings;
+  const labelLama = labelPekerjaan();   // untuk melabel ulang titik yang sudah ditaging
+  const ulpLama = s.lokasiUlp;
   s.penghantar = $('#s-penghantar').value;
   s.sagFactor = Math.min(1.5, Math.max(1, parseFloat($('#s-sag').value) || 1.03)); // andongan tidak mungkin < 1
   s.ppnAktif = $('#s-ppn-aktif').checked;
@@ -1829,6 +1842,24 @@ function simpanPengaturan() {
   s.akurasiMin = Math.min(500, Math.max(1, parseFloat($('#s-akurasi').value) || 15));
   s.jenisPekerjaan = JENIS_PEKERJAAN[$('#s-jenis-pekerjaan').value] ? $('#s-jenis-pekerjaan').value : 'PERLUASAN_JTM';
   s.namaPekerjaan = $('#s-nama-pekerjaan').value.trim().slice(0, 80);
+  s.lokasiUlp = DAFTAR_ULP.includes($('#s-lokasi-ulp').value) ? $('#s-lokasi-ulp').value : '';
+
+  // identitas pekerjaan berubah → titik yang SUDAH ditaging di proyek ini ikut
+  // dilabel ulang (hanya milik sendiri / tanpa pemilik; titik surveyor lain tidak
+  // disentuh) — begitu tersimpan, sinkron otomatis membawanya ke database & dasbor
+  const labelBaru = labelPekerjaan();
+  if (labelBaru !== labelLama || s.lokasiUlp !== ulpLama) {
+    let n = 0;
+    state.poles.forEach(p => {
+      if (!bolehUbahTitik(p)) return;
+      if (p.pekerjaan && p.pekerjaan !== labelLama) return; // milik pekerjaan lain — jangan disentuh
+      p.pekerjaan = labelBaru;
+      if (s.lokasiUlp) p.ulp = s.lokasiUlp;
+      p.diubah = Date.now();
+      n++;
+    });
+    if (n) toast(`🏷 ${n} titik proyek ini diberi identitas "${labelBaru}"${s.lokasiUlp ? ' (' + s.lokasiUlp + ')' : ''} — tersinkron otomatis`);
+  }
   s.petugas = $('#s-petugas').value.trim().slice(0, 40);
   s.server = $('#s-server').value.trim().slice(0, 200);
   const kodeUnitMentah = $('#s-unit').value.trim();

@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=47">
+  <link rel="stylesheet" href="css/style.css?v=48">
 </head>
 <body>
 
@@ -230,6 +230,10 @@
           <div class="form-grup"><label>Nama Pekerjaan / Lokasi</label>
             <input type="text" id="s-nama-pekerjaan" maxlength="80" placeholder="mis. Perluasan Dusun Waraka"></div>
         </div>
+        <div class="form-grup"><label>Lokasi Pekerjaan (ULP)</label>
+          <select id="s-lokasi-ulp"></select></div>
+        <p class="catatan-kecil" style="margin-top:-6px;margin-bottom:12px">Identitas ini menempel otomatis pada semua
+          titik proyek ini — begitu disimpan, pekerjaannya langsung tampil di database &amp; dasbor monitoring.</p>
 
         <div class="judul-seksi">Sinkronisasi Terpusat (opsional)</div>
         <div class="form-grup"><label>Nama Petugas / Surveyor</label>
@@ -389,9 +393,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=47"></script>
-  <script src="js/app.js?v=47"></script>
-  <script src="js/masuk.js?v=47"></script>
+  <script src="js/data.js?v=48"></script>
+  <script src="js/app.js?v=48"></script>
+  <script src="js/masuk.js?v=48"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
