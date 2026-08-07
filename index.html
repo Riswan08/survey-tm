@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=38">
+  <link rel="stylesheet" href="css/style.css?v=39">
 </head>
 <body>
 
@@ -183,8 +183,8 @@
       <div class="modal-kepala">🗒️ Penugasan Survey
         <button class="tutup" data-tutup="modal-tugas">×</button></div>
       <div class="modal-isi">
-        <p class="catatan-kecil" style="margin-bottom:10px">Tugas dibuat perencana/manajer di Dasbor dan tiba lewat
-          ⬇️ Ambil dari Server. Setelah mengubah status, ⬆️ Kirim ke Server agar kantor melihat kemajuannya.</p>
+        <p class="catatan-kecil" style="margin-bottom:10px">Tugas dibuat perencana/manajer di Dasbor dan tiba otomatis
+          saat aplikasi tersambung server unit. Perubahan status (Mulai/Selesai) juga terkirim sendiri.</p>
         <div id="isi-tugas"></div>
       </div>
       <div class="modal-kaki">
@@ -223,12 +223,11 @@
           <div class="form-grup"><label>Kode Unit</label>
             <input type="text" id="s-unit" placeholder="UP3-MASOHI"></div>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:6px">
-          <button class="tombol utama" id="s-kirim" style="flex:1">⬆️ Kirim ke Server</button>
-          <button class="tombol utama" id="s-ambil" style="flex:1">⬇️ Ambil dari Server</button>
-        </div>
-        <p class="catatan-kecil">Server = <code>server/cakra-server.js</code> dijalankan PLN IT di komputer kantor (panduan di repo).
-        Tanpa server pun data antar surveyor tetap bisa digabung lewat Dasbor (impor beberapa file JSON).</p>
+        <p class="catatan-kecil" id="s-status-sinkron" style="margin-bottom:8px;font-weight:700"></p>
+        <button class="tombol polos" id="s-sinkron" style="width:100%;margin-bottom:6px">🔄 Sinkronkan Sekarang (bila perlu)</button>
+        <p class="catatan-kecil">Setelah alamat server &amp; kode unit terisi, <b>cukup SIMPAN pekerjaan</b> —
+        semua titik &amp; usulan terkirim sendiri ke database unit dan langsung terbaca di Dasbor.
+        Kode unit hanya huruf/angka/<code>-</code>/<code>_</code> (tanpa spasi), sama untuk semua perangkat.</p>
 
         <div class="judul-seksi">Harga Satuan (bisa diubah, tersimpan di perangkat)</div>
         <p class="catatan-kecil" id="s-ket-harga" style="margin-bottom:8px"></p>
@@ -373,9 +372,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=38"></script>
-  <script src="js/app.js?v=38"></script>
-  <script src="js/masuk.js?v=38"></script>
+  <script src="js/data.js?v=39"></script>
+  <script src="js/app.js?v=39"></script>
+  <script src="js/masuk.js?v=39"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

@@ -196,6 +196,31 @@ function simpan() {
 // otomatis (senyap, dijeda 4 dtk) — pekerjaan & usulan langsung terbaca di
 // database unit untuk monitoring, tanpa tombol kirim/unduh manual.
 let timerSinkron = null;
+let waktuSinkronTerakhir = Number(localStorage.getItem('cakra_sinkron_terakhir')) || 0;
+
+function catatSinkron() {
+  waktuSinkronTerakhir = Date.now();
+  localStorage.setItem('cakra_sinkron_terakhir', String(waktuSinkronTerakhir));
+  perbaruiStatusSinkron();
+}
+
+// kode unit yang sah untuk server: huruf/angka/-/_ — spasi dll. diganti strip
+function rapikanKodeUnit(v) {
+  return String(v || '').trim().replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
+function perbaruiStatusSinkron() {
+  const el = $('#s-status-sinkron');
+  if (!el) return;
+  if (!urlServer() || !state.settings.kodeUnit) {
+    el.textContent = '⚪ Sinkron otomatis nonaktif — isi alamat server & kode unit lalu Simpan.';
+  } else if (navigator.onLine === false) {
+    el.textContent = '🟡 Offline — perubahan aman di HP, terkirim sendiri begitu online.';
+  } else {
+    el.textContent = '🟢 Sinkron otomatis AKTIF — setiap simpan langsung terkirim ke database unit'
+      + (waktuSinkronTerakhir ? ` (terakhir ${new Date(waktuSinkronTerakhir).toLocaleTimeString('id-ID')})` : '') + '.';
+  }
+}
 
 function sinkronSiap() {
   return !!(urlServer() && state.settings.kodeUnit) && navigator.onLine !== false;
@@ -1743,6 +1768,7 @@ function renderPengaturan() {
   $('#s-petugas').value = s.petugas || '';
   $('#s-server').value = s.server || '';
   $('#s-unit').value = s.kodeUnit || '';
+  perbaruiStatusSinkron();
 
   // identitas sesi (nama, ULP, peran) + keterangan hak harga
   const sesi = (typeof sesiCakra === 'function') ? sesiCakra() : null;
@@ -1787,7 +1813,12 @@ function simpanPengaturan() {
   s.namaPekerjaan = $('#s-nama-pekerjaan').value.trim().slice(0, 80);
   s.petugas = $('#s-petugas').value.trim().slice(0, 40);
   s.server = $('#s-server').value.trim().slice(0, 200);
-  s.kodeUnit = $('#s-unit').value.trim().slice(0, 60);
+  const kodeUnitMentah = $('#s-unit').value.trim();
+  s.kodeUnit = rapikanKodeUnit(kodeUnitMentah);
+  if (kodeUnitMentah && s.kodeUnit !== kodeUnitMentah) {
+    $('#s-unit').value = s.kodeUnit;
+    toast(`Kode unit dirapikan menjadi "${s.kodeUnit}" (tanpa spasi/simbol) — samakan di semua perangkat`);
+  }
   const overrideSebelum = JSON.stringify([s.hargaOverride, s.jasaOverride]);
   document.querySelectorAll('#editor-harga input[data-kode]').forEach(inp => {
     const kode = inp.dataset.kode, nilai = Number(inp.value);
@@ -1914,7 +1945,8 @@ function ubahStatusTugas(id, status) {
   t.status = status;
   t.diubah = Date.now();
   simpanTugas(); renderTugas(); perbaruiBadgeTugas();
-  toast(`🗒️ "${t.judul}" → ${STATUS_TUGAS[status].nama} — kirim ke server agar kantor ikut melihat`);
+  jadwalkanSinkronOtomatis(); // status tugas ikut terkirim sendiri ke database unit
+  toast(`🗒️ "${t.judul}" → ${STATUS_TUGAS[status].nama}`);
 }
 
 function renderTugas() {
@@ -2007,6 +2039,7 @@ async function kirimKeServer(senyap) {
     });
     if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
     const d = await res.json();
+    catatSinkron();
     if (!senyap) toast(`✅ Terkirim — server kini menyimpan ${d.total} titik unit ini`
       + (d.hargaBerubah ? ' · harga terpusat diperbarui' : ''));
   } catch (e) {
@@ -2873,11 +2906,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const terapkanIsianSync = () => {
     state.settings.petugas = $('#s-petugas').value.trim().slice(0, 40);
     state.settings.server = $('#s-server').value.trim().slice(0, 200);
-    state.settings.kodeUnit = $('#s-unit').value.trim().slice(0, 60);
+    state.settings.kodeUnit = rapikanKodeUnit($('#s-unit').value);
+    $('#s-unit').value = state.settings.kodeUnit;
     simpan();
+    perbaruiStatusSinkron();
   };
-  $('#s-kirim').onclick = () => { terapkanIsianSync(); kirimKeServer(); };
-  $('#s-ambil').onclick = () => { terapkanIsianSync(); ambilDariServer(); };
+  // sinkron manual hanya sebagai cadangan — normalnya cukup SIMPAN, semuanya otomatis
+  $('#s-sinkron').onclick = async () => {
+    terapkanIsianSync();
+    await kirimKeServer();
+    await ambilDariServer();
+  };
+  window.addEventListener('online', perbaruiStatusSinkron);
+  window.addEventListener('offline', perbaruiStatusSinkron);
 
   // ekspor
   $('#e-csv').onclick = eksporCSV;
