@@ -44,6 +44,52 @@ function skorPrioritas(p) {
 }
 const warnaSkor = (s) => (s >= 6 ? '#e53935' : s >= 3 ? '#f57c00' : '#2e7d32');
 
+// ---------------- hitungan PERLUASAN JTM (fokus utama dasbor) ----------------
+function jarakM(a, b) {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+// biaya satu tiang rencana: batang tiang + BOM konstruksi + aksesoris + jasa tanam
+function biayaTitikRencana(p) {
+  let total = 0;
+  const tambah = (kode, q) => { total += (hargaMat(kode) + jasaMat(kode)) * q; };
+  if (MATERIALS[p.tiang]) tambah(p.tiang, 1);
+  const k = KONSTRUKSI[p.konstruksi];
+  if (k) Object.entries(k.bom).forEach(([kode, q]) => tambah(kode, q));
+  (Array.isArray(p.aksesoris) ? p.aksesoris : []).forEach(a => {
+    const ak = AKSESORIS[a];
+    if (ak) Object.entries(ak.bom).forEach(([kode, q]) => tambah(kode, q));
+  });
+  total += hargaMat('JASA_TIANG');
+  return total;
+}
+
+// rekap perluasan per pekerjaan: jumlah tiang rencana, panjang rute, ± nilai RAB
+// (penghantar diperkirakan AAAC 70 · 3 fasa · andongan 3% + jasa tarik)
+function perluasanPerPekerjaan() {
+  const grup = {};
+  poles.filter(p => p.mode === 'rencana').forEach(p => {
+    const kunci = p.pekerjaan || '(tanpa nama pekerjaan)';
+    (grup[kunci] = grup[kunci] || []).push(p);
+  });
+  const hasil = {};
+  Object.entries(grup).forEach(([nama, daftar]) => {
+    let rute = 0;
+    for (let i = 1; i < daftar.length; i++) {
+      const d = jarakM(daftar[i - 1], daftar[i]);
+      if (d <= 2000) rute += d; // bentang > 2 km = bukan satu rantai (lokasi berbeda) — dilewati
+    }
+    let biaya = 0;
+    daftar.forEach(p => { biaya += biayaTitikRencana(p); });
+    biaya += rute * 3 * 1.03 * hargaMat('PH_AAAC70') + (rute / 1000) * hargaMat('JASA_TARIK');
+    hasil[nama] = { tiang: daftar.length, rute, biaya };
+  });
+  return hasil;
+}
+
 // ---------------- normalisasi & gabung ----------------
 function rapikan(p, i) {
   if (!p || typeof p !== 'object') return null;
@@ -398,24 +444,32 @@ function semuaUsulan() {
 }
 
 function renderRingkasan() {
+  // baris pertama: PERLUASAN JTM — fokus utama pemantauan
+  const perluasan = perluasanPerPekerjaan();
+  const namaPerluasan = Object.keys(perluasan);
+  const totTiang = namaPerluasan.reduce((a, n) => a + perluasan[n].tiang, 0);
+  const totRute = namaPerluasan.reduce((a, n) => a + perluasan[n].rute, 0);
+  const totBiaya = namaPerluasan.reduce((a, n) => a + perluasan[n].biaya, 0);
+  const gayaUtama = 'background:#e8f2fb;border-color:#9ec4e4';
+  let html = `
+    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${namaPerluasan.length}</div><div class="ket"><b>PEKERJAAN PERLUASAN JTM</b></div></div>
+    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${totTiang}</div><div class="ket"><b>TIANG RENCANA</b> (semua pekerjaan)</div></div>
+    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${totRute >= 1000
+      ? (totRute / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' km'
+      : angka(totRute) + ' m'}</div><div class="ket"><b>PANJANG RUTE JARINGAN</b></div></div>
+    <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${rupiah(totBiaya)}</div><div class="ket"><b>± NILAI RAB PERLUASAN</b></div></div>`;
+
+  // baris berikutnya: survey aset & tindak lanjut (pelengkap)
   const eksisting = poles.filter(p => p.mode === 'eksisting');
   const rusak = eksisting.filter(p => p.kondisi !== 'baik');
   const usulan = semuaUsulan();
   const totalNilai = usulan.reduce((jml, u) => jml + u.total, 0);
+  const selesai = usulan.filter(u => u.entri.status === 'selesai');
   const pelanggan = poles.filter(p => p.mode === 'pelanggan');
-  let html = `
-    <div class="kartu-stat"><div class="nilai">${poles.length}</div><div class="ket">Total titik (semua surveyor)</div></div>
-    <div class="kartu-stat"><div class="nilai">${eksisting.length}</div><div class="ket">Aset eksisting tersurvey</div></div>
-    <div class="kartu-stat"><div class="nilai" style="color:#7b1fa2">${pelanggan.length}</div><div class="ket">Calon pelanggan</div></div>
-    <div class="kartu-stat"><div class="nilai" style="color:#e53935">${rusak.length}</div><div class="ket">Aset kondisi rusak</div></div>
-    <div class="kartu-stat"><div class="nilai">${usulan.length}</div><div class="ket">Usulan perbaikan</div></div>
-    <div class="kartu-stat"><div class="nilai">${rupiah(totalNilai)}</div><div class="ket">Total nilai usulan</div></div>`;
-  Object.entries(STATUS_USULAN).forEach(([kode, st]) => {
-    const grup = usulan.filter(u => u.entri.status === kode);
-    const nilai = grup.reduce((jml, u) => jml + u.total, 0);
-    html += `<div class="kartu-stat"><div class="nilai" style="color:${st.warna}">${grup.length} · ${rupiah(nilai)}</div>
-      <div class="ket">${st.nama}</div></div>`;
-  });
+  html += `
+    <div class="kartu-stat"><div class="nilai">${eksisting.length}</div><div class="ket">Aset tersurvey (${rusak.length} rusak)</div></div>
+    <div class="kartu-stat"><div class="nilai">${usulan.length} · ${rupiah(totalNilai)}</div><div class="ket">Usulan perbaikan (${selesai.length} selesai)</div></div>
+    <div class="kartu-stat"><div class="nilai" style="color:#7b1fa2">${pelanggan.length}</div><div class="ket">Calon pelanggan</div></div>`;
   $('#d-ringkasan').innerHTML = html;
 }
 
@@ -450,23 +504,34 @@ function renderDaftarPekerjaan() {
     if ((p.diubah || 0) > g.terakhir) g.terakhir = p.diubah;
   });
 
+  const perluasan = perluasanPerPekerjaan();
   let html = `<table class="rab"><tr>
     <th>Nama Pekerjaan</th><th>Unit</th><th>Petugas</th>
-    <th class="angka">Titik</th><th class="angka">Usulan</th><th class="angka">Nilai Usulan (Rp)</th>
-    <th>Terakhir Disimpan</th></tr>`;
+    <th class="angka">Tiang Rencana</th><th class="angka">Rute</th><th class="angka">± RAB Perluasan (Rp)</th>
+    <th class="angka">Usulan Perbaikan</th><th>Terakhir Disimpan</th></tr>`;
   Object.entries(grup)
-    .sort((a, b) => b[1].terakhir - a[1].terakhir) // yang terbaru di atas
+    .sort((a, b) => {
+      // pekerjaan perluasan (punya tiang rencana) selalu di atas, lalu urut terbaru
+      const pa = perluasan[a[0]] ? 1 : 0, pb = perluasan[b[0]] ? 1 : 0;
+      return (pb - pa) || (b[1].terakhir - a[1].terakhir);
+    })
     .forEach(([nama, g]) => {
+      const pl = perluasan[nama];
       html += `<tr>
         <td><b>${nama}</b></td>
         <td>${[...g.ulp].join(', ') || '—'}</td>
         <td>${[...g.petugas].join(', ') || '—'}</td>
-        <td class="angka">${g.titik}</td>
-        <td class="angka">${g.usulan ? `${g.usulan}${g.selesai ? ` (${g.selesai} selesai)` : ''}` : '—'}</td>
-        <td class="angka">${g.nilai ? angka(g.nilai) : '—'}</td>
+        <td class="angka">${pl ? pl.tiang : '—'}</td>
+        <td class="angka">${pl && pl.rute ? (pl.rute >= 1000
+          ? (pl.rute / 1000).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' km'
+          : angka(pl.rute) + ' m') : '—'}</td>
+        <td class="angka"><b>${pl ? angka(pl.biaya) : '—'}</b></td>
+        <td class="angka">${g.usulan ? `${g.usulan}${g.selesai ? ` (${g.selesai} selesai)` : ''} · ${angka(g.nilai)}` : '—'}</td>
         <td>${tglSingkat(g.terakhir)}</td></tr>`;
     });
-  wadah.innerHTML = html + '</table>';
+  wadah.innerHTML = html + `</table>
+    <p class="catatan-kecil">± RAB Perluasan = tiang + konstruksi + aksesoris + jasa tanam + perkiraan penghantar
+    (AAAC 70 · 3 fasa · andongan 3%) + jasa tarik — RAB rinci resmi tetap dari aplikasi surveyor (🧾 RAB Resmi).</p>`;
 }
 
 // ---------------- monitoring per petugas & unit (ULP) ----------------
