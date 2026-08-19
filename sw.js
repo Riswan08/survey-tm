@@ -9,7 +9,7 @@
      SW), jadi taging offline aman.
    ============================================================ */
 
-const VERSI = 'v49';
+const VERSI = 'v50';
 const CACHE_APP = 'stm-app-' + VERSI;
 const CACHE_TILE = 'stm-tiles-v1';
 const MAKS_TILE = 4000; // batas jumlah tile tersimpan
@@ -17,12 +17,12 @@ const MAKS_TILE = 4000; // batas jumlah tile tersimpan
 const ASET_APP = [
   './',
   './index.html',
-  './css/style.css?v=49',
-  './js/data.js?v=49',
-  './js/app.js?v=49',
+  './css/style.css?v=50',
+  './js/data.js?v=50',
+  './js/app.js?v=50',
   './dasbor.html',
-  './js/dasbor.js?v=49',
-  './js/masuk.js?v=49',
+  './js/dasbor.js?v=50',
+  './js/masuk.js?v=50',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/images/layers.png',
@@ -69,6 +69,8 @@ self.addEventListener('fetch', (e) => {
   // API sinkronisasi TIDAK PERNAH di-cache — data survey harus selalu segar
   // (penting saat aplikasi dibuka langsung dari cakra-server: satu origin)
   if (url.pathname.startsWith('/api/')) return;
+  // konfig.json juga selalu dari jaringan — berisi alamat server terkini
+  if (url.pathname.endsWith('/konfig.json')) return;
 
   // Tile peta: cache-first, isi cache saat online
   if (HOST_TILE.some((h) => url.hostname.endsWith(h))) {

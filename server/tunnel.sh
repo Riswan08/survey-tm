@@ -2,37 +2,27 @@
 # ============================================================
 # TUNNEL HTTPS Si CAKRA — buka server kantor ke internet
 # ------------------------------------------------------------
-# Memberi cakra-server alamat HTTPS publik (gratis, tanpa akun)
-# lewat Cloudflare Quick Tunnel, sehingga:
-#   • aplikasi survey di github.io bisa sinkron dari MANA SAJA
-#     (blokir mixed-content HTTPS→HTTP hilang)
-#   • GPS & semua fitur tetap jalan (github.io = HTTPS aman)
-#   • semua petugas & dasbor melihat database yang sama
+# 1) Menyalakan Cloudflare Quick Tunnel (gratis, tanpa akun)
+#    untuk cakra-server → dapat alamat https://xx.trycloudflare.com
+# 2) OTOMATIS menulis alamat itu ke konfig.json dan push ke
+#    GitHub → semua aplikasi & dasbor tersambung sendiri,
+#    TIDAK ADA yang perlu mengetik alamat server / kode unit.
 #
 # CARA PAKAI (di komputer yang menjalankan cakra-server):
-#   1) pasang cloudflared SEKALI:
-#        macOS  : brew install cloudflared
-#        tanpa brew: unduh dari
-#          https://github.com/cloudflare/cloudflared/releases/latest
-#          (file cloudflared-darwin-arm64.tgz → ekstrak → taruh di PATH)
-#        Windows: winget install Cloudflare.cloudflared
-#   2) jalankan server : node server/cakra-server.js
-#   3) jalankan skrip  : bash server/tunnel.sh
-#   4) salin alamat https://....trycloudflare.com yang muncul →
-#      isi ke "Alamat Server CAKRA" di ⚙️ Pengaturan SEMUA perangkat
+#   node server/cakra-server.js      (biarkan berjalan)
+#   bash server/tunnel.sh            (biarkan berjalan)
 #
-# CATATAN:
-#   • Alamat berubah setiap tunnel dijalankan ulang — biarkan terus
-#     berjalan di komputer kantor. Alamat permanen: buat akun
-#     Cloudflare (gratis) lalu pakai "named tunnel".
-#   • Server kini terjangkau dari internet — kunci datanya adalah
-#     KODE UNIT: pakai kode yang panjang & tidak mudah ditebak.
+# Prasyarat sekali saja: cloudflared terpasang
+#   (brew install cloudflared / unduh rilis resmi Cloudflare)
 # ============================================================
 set -e
 
 PORT="${PORT:-8787}"
+DIR_REPO="$(cd "$(dirname "$0")/.." && pwd)"
+CF="$(command -v cloudflared || true)"
+[ -z "$CF" ] && [ -x "$HOME/bin/cloudflared" ] && CF="$HOME/bin/cloudflared"
 
-if ! command -v cloudflared >/dev/null 2>&1; then
+if [ -z "$CF" ]; then
   echo "❌ cloudflared belum terpasang."
   echo "   macOS : brew install cloudflared"
   echo "   Unduh : https://github.com/cloudflare/cloudflared/releases/latest"
@@ -45,8 +35,53 @@ if ! curl -s -m 3 -o /dev/null "http://localhost:${PORT}/"; then
   exit 1
 fi
 
-echo "🚇 Membuka tunnel HTTPS untuk http://localhost:${PORT} ..."
-echo "   (alamat https://....trycloudflare.com akan muncul di bawah —"
-echo "    biarkan jendela ini tetap terbuka selama jam kerja)"
+LOG="$(mktemp -t cakra-tunnel)"
+echo "🚇 Menyalakan tunnel HTTPS untuk http://localhost:${PORT} ..."
+"$CF" tunnel --url "http://localhost:${PORT}" > "$LOG" 2>&1 &
+PID=$!
+trap 'kill $PID 2>/dev/null' EXIT
+
+URL=""
+for i in $(seq 1 40); do
+  URL="$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$LOG" | head -1)"
+  [ -n "$URL" ] && break
+  sleep 1
+done
+
+if [ -z "$URL" ]; then
+  echo "❌ Alamat tunnel tidak muncul — log: $LOG"
+  exit 1
+fi
+
 echo ""
-exec cloudflared tunnel --url "http://localhost:${PORT}"
+echo "✅ Tunnel aktif: $URL"
+
+# --- perbarui konfig.json + push ke GitHub (perangkat lain ikut otomatis) ---
+KODE_UNIT="$(node -e "try{process.stdout.write(JSON.parse(require('fs').readFileSync('$DIR_REPO/konfig.json','utf8')).kodeUnit||'')}catch(e){}" 2>/dev/null)"
+KODE_UNIT="${KODE_UNIT:-UP3-MASOHI}"
+cat > "$DIR_REPO/konfig.json" <<KONF
+{
+  "server": "$URL",
+  "kodeUnit": "$KODE_UNIT",
+  "keterangan": "Konfigurasi otomatis Si CAKRA — aplikasi & dasbor membaca file ini saat dibuka; server/tunnel.sh memperbaruinya otomatis saat tunnel dinyalakan."
+}
+KONF
+
+if git -C "$DIR_REPO" diff --quiet -- konfig.json; then
+  echo "ℹ️  konfig.json sudah sesuai — tidak perlu push."
+else
+  if git -C "$DIR_REPO" add konfig.json && \
+     git -C "$DIR_REPO" commit -q -m "Perbarui alamat server otomatis (tunnel): $URL" && \
+     git -C "$DIR_REPO" push -q origin main; then
+    echo "📤 konfig.json diperbarui & di-push — semua perangkat akan tersambung"
+    echo "   otomatis begitu GitHub Pages selesai build (±1-2 menit)."
+  else
+    echo "⚠️  Gagal push konfig.json — perbarui manual: isi \"server\": \"$URL\""
+    echo "   di konfig.json lalu commit & push."
+  fi
+fi
+
+echo ""
+echo "Biarkan jendela ini tetap terbuka selama jam kerja."
+echo "(Ctrl+C untuk berhenti — alamat akan hangus dan berganti saat dinyalakan lagi.)"
+wait $PID

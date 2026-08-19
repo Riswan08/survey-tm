@@ -240,6 +240,39 @@ function sinkronSiap() {
   return !!(urlServer() && state.settings.kodeUnit) && navigator.onLine !== false && !campuranTerblokir();
 }
 
+// ---------------- KONFIGURASI OTOMATIS (konfig.json) ----------------
+// Alamat server & kode unit dibaca dari konfig.json di repo — pengguna TIDAK
+// perlu mengetik apa pun. server/tunnel.sh memperbarui file ini otomatis saat
+// tunnel dinyalakan, semua perangkat mengikuti saat aplikasi dibuka.
+// Isian manual di Pengaturan tetap menang (serverOtomatis jadi false).
+let konfigTerbaru = null;
+
+async function muatKonfigOtomatis() {
+  try {
+    const res = await fetch('konfig.json?nc=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const k = await res.json();
+    if (!k || typeof k.server !== 'string' || !k.server.trim()) return;
+    konfigTerbaru = {
+      server: k.server.trim().replace(/\/+$/, '').slice(0, 200),
+      kodeUnit: rapikanKodeUnit(k.kodeUnit || ''),
+    };
+    const s = state.settings;
+    if (!s.server || s.serverOtomatis) {
+      const berubah = s.server !== konfigTerbaru.server ||
+        (konfigTerbaru.kodeUnit && s.kodeUnit !== konfigTerbaru.kodeUnit);
+      s.server = konfigTerbaru.server;
+      if (konfigTerbaru.kodeUnit) s.kodeUnit = konfigTerbaru.kodeUnit;
+      s.serverOtomatis = true;
+      if (berubah) {
+        simpan();
+        toast('🔗 Tersambung otomatis ke server unit — tidak perlu mengisi alamat apa pun');
+      }
+      perbaruiStatusSinkron();
+    }
+  } catch (e) { /* offline / konfig belum ada — pakai pengaturan tersimpan */ }
+}
+
 function jadwalkanSinkronOtomatis() {
   if (!sinkronSiap()) return;
   clearTimeout(timerSinkron);
@@ -355,6 +388,7 @@ function normalisasiState(d) {
   if (typeof s.namaPekerjaan === 'string') hasil.settings.namaPekerjaan = s.namaPekerjaan.slice(0, 80);
   if (DAFTAR_ULP.includes(s.lokasiUlp)) hasil.settings.lokasiUlp = s.lokasiUlp;
   if (typeof s.server === 'string') hasil.settings.server = s.server.slice(0, 200);
+  if (typeof s.serverOtomatis === 'boolean') hasil.settings.serverOtomatis = s.serverOtomatis;
   if (typeof s.kodeUnit === 'string') hasil.settings.kodeUnit = s.kodeUnit.slice(0, 60);
   if (typeof s.petugas === 'string') hasil.settings.petugas = s.petugas.slice(0, 40);
   if (MATERIALS[s.tiangTerakhir] && MATERIALS[s.tiangTerakhir].kategori === 'tiang') hasil.settings.tiangTerakhir = s.tiangTerakhir;
@@ -1868,6 +1902,9 @@ function simpanPengaturan() {
     $('#s-unit').value = s.kodeUnit;
     toast(`Kode unit dirapikan menjadi "${s.kodeUnit}" (tanpa spasi/simbol) — samakan di semua perangkat`);
   }
+  // isian sama dengan konfig (atau dikosongkan) = tetap ikut pembaruan otomatis;
+  // isian beda = pilihan manual pengguna, tidak ditimpa konfig
+  s.serverOtomatis = !s.server || !!(konfigTerbaru && s.server === konfigTerbaru.server);
   const overrideSebelum = JSON.stringify([s.hargaOverride, s.jasaOverride]);
   document.querySelectorAll('#editor-harga input[data-kode]').forEach(inp => {
     const kode = inp.dataset.kode, nilai = Number(inp.value);
@@ -2956,9 +2993,9 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('offline', badgeOffline);
   badgeOffline();
 
-  // sinkron otomatis: tarik data unit saat aplikasi dibuka & saat kembali online,
-  // perubahan lokal terkirim sendiri lewat jadwalkanSinkronOtomatis (dipicu simpan)
-  if (sinkronSiap()) setTimeout(() => ambilDariServer(true), 1200);
+  // konfigurasi otomatis dari konfig.json, lalu tarik data unit —
+  // pengguna tidak perlu mengetik alamat server / kode unit
+  muatKonfigOtomatis().then(() => { if (sinkronSiap()) ambilDariServer(true); });
   window.addEventListener('online', () => {
     if (sinkronSiap()) { ambilDariServer(true); jadwalkanSinkronOtomatis(); }
   });
@@ -3025,6 +3062,8 @@ document.addEventListener('DOMContentLoaded', () => {
     state.settings.server = $('#s-server').value.trim().slice(0, 200);
     state.settings.kodeUnit = rapikanKodeUnit($('#s-unit').value);
     $('#s-unit').value = state.settings.kodeUnit;
+    state.settings.serverOtomatis = !state.settings.server ||
+      !!(konfigTerbaru && state.settings.server === konfigTerbaru.server);
     simpan();
     perbaruiStatusSinkron();
   };

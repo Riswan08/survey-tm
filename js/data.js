@@ -475,6 +475,7 @@ const DEFAULT_SETTINGS = {
   lokasiUlp: '',                    // lokasi pekerjaan (ULP) — tercatat di tiap titik
   // sinkronisasi terpusat (M4) — kosongkan jika bekerja mandiri/offline saja
   server: '',               // mis. http://192.168.1.10:8787 (server CAKRA internal unit)
+  serverOtomatis: false,    // true = alamat diisi otomatis dari konfig.json (ikut pembaruan)
   kodeUnit: '',             // kode unit = kunci akses data bersama
   petugas: '',              // nama surveyor — tercatat di tiap titik
 };

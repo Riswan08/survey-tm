@@ -976,12 +976,29 @@ function bacaCfg() {
   try { return JSON.parse(localStorage.getItem(KUNCI_CFG)) || {}; } catch (e) { return {}; }
 }
 
+let konfigOtomatisD = null; // dari konfig.json — nol-konfigurasi untuk pemantau
+
+async function muatKonfigD() {
+  try {
+    const res = await fetch('konfig.json?nc=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const k = await res.json();
+    if (k && typeof k.server === 'string' && k.server.trim()) {
+      konfigOtomatisD = {
+        server: k.server.trim().replace(/\/+$/, ''),
+        unit: String(k.kodeUnit || '').trim(),
+      };
+    }
+  } catch (e) { /* offline / konfig belum ada */ }
+}
+
 function cfgServer() {
   const app = ambilCfgAplikasi();
   const lama = bacaCfg(); // simpanan dasbor versi lama sebagai cadangan
+  const auto = konfigOtomatisD || {};
   return {
-    server: (app.server || lama.server || '').trim().replace(/\/+$/, ''),
-    unit: (app.unit || lama.unit || '').trim(),
+    server: (app.server || lama.server || auto.server || '').trim().replace(/\/+$/, ''),
+    unit: (app.unit || lama.unit || auto.unit || '').trim(),
   };
 }
 
@@ -1081,9 +1098,10 @@ function ambilCfgAplikasi() {
 document.addEventListener('DOMContentLoaded', () => {
   initPeta();
 
-  // data survey perangkat ini tampil otomatis; server unit digabung otomatis di latar belakang
+  // data survey perangkat ini tampil otomatis; alamat server dari konfig.json
+  // (nol-konfigurasi) lalu data unit digabung otomatis di latar belakang
   muatDataLokal();
-  ambilServer();
+  muatKonfigD().then(ambilServer);
   // monitoring langsung: dasbor menyegarkan diri dari server tiap 60 detik
   setInterval(() => { muatDataLokal(); ambilServer(); }, 60000);
 
