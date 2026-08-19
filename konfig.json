@@ -1,5 +1,5 @@
 {
-  "server": "https://seemed-searches-teachers-unavailable.trycloudflare.com",
+  "server": "https://103-143-12-183.domainesia.io",
   "kodeUnit": "UP3-MASOHI",
-  "keterangan": "Konfigurasi otomatis Si CAKRA — aplikasi & dasbor membaca file ini saat dibuka; server/tunnel.sh memperbaruinya otomatis saat tunnel dinyalakan."
+  "keterangan": "Konfigurasi otomatis Si CAKRA — server permanen di VPS DomaiNesia (24 jam). Aplikasi & dasbor membaca file ini saat dibuka; tidak ada yang perlu diketik pengguna."
 }
