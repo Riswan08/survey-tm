@@ -9,7 +9,7 @@
      SW), jadi taging offline aman.
    ============================================================ */
 
-const VERSI = 'v48';
+const VERSI = 'v49';
 const CACHE_APP = 'stm-app-' + VERSI;
 const CACHE_TILE = 'stm-tiles-v1';
 const MAKS_TILE = 4000; // batas jumlah tile tersimpan
@@ -17,12 +17,12 @@ const MAKS_TILE = 4000; // batas jumlah tile tersimpan
 const ASET_APP = [
   './',
   './index.html',
-  './css/style.css?v=48',
-  './js/data.js?v=48',
-  './js/app.js?v=48',
+  './css/style.css?v=49',
+  './js/data.js?v=49',
+  './js/app.js?v=49',
   './dasbor.html',
-  './js/dasbor.js?v=48',
-  './js/masuk.js?v=48',
+  './js/dasbor.js?v=49',
+  './js/masuk.js?v=49',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/images/layers.png',

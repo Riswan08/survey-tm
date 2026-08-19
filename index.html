@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=48">
+  <link rel="stylesheet" href="css/style.css?v=49">
 </head>
 <body>
 
@@ -18,15 +18,17 @@
     <div class="judul">Si CAKRA<small>Sistem Cerdas Analisis Kebutuhan Rencana Aset</small></div>
     <span id="badge-offline" class="sembunyi" title="Tidak ada internet — taging & GPS tetap berfungsi, data tersimpan di HP">📵 OFFLINE</span>
     <div class="spacer"></div>
-    <button class="tombol-bar" id="btn-cari" title="Cari desa / lokasi / tikor">🔍</button>
-    <button class="tombol-bar" id="btn-daftar">📋 Tiang</button>
-    <button class="tombol-bar" id="btn-tugas" title="Penugasan survey untuk Anda" style="position:relative">🗒️
-      <span id="badge-tugas" class="badge-skor sembunyi" style="background:#e53935;position:absolute;top:-5px;right:-5px">0</span></button>
-    <button class="tombol-bar" id="btn-perluasan" title="Pekerjaan Perluasan JTM / JTR">⚡</button>
-    <button class="tombol-bar" id="btn-rab">💰 RAB</button>
-    <a class="tombol-bar" id="btn-dasbor" href="dasbor.html" title="Dasbor manajemen" style="text-decoration:none">📊</a>
-    <button class="tombol-bar" id="btn-pengaturan">⚙️</button>
-    <button class="tombol-bar" id="btn-ekspor">📤</button>
+    <nav id="menu-bar">
+      <button class="tombol-bar" id="btn-cari" title="Cari desa / lokasi / tikor">🔍</button>
+      <button class="tombol-bar" id="btn-daftar" title="Daftar tiang">📋<span class="teks-bar"> Tiang</span></button>
+      <button class="tombol-bar" id="btn-tugas" title="Penugasan survey untuk Anda" style="position:relative">🗒️
+        <span id="badge-tugas" class="badge-skor sembunyi" style="background:#e53935;position:absolute;top:-5px;right:-5px">0</span></button>
+      <button class="tombol-bar" id="btn-perluasan" title="Pekerjaan Perluasan JTM / JTR">⚡</button>
+      <button class="tombol-bar" id="btn-rab" title="RAB survey">💰<span class="teks-bar"> RAB</span></button>
+      <a class="tombol-bar" id="btn-dasbor" href="dasbor.html" title="Dasbor manajemen" style="text-decoration:none">📊</a>
+      <button class="tombol-bar" id="btn-pengaturan" title="Pengaturan">⚙️</button>
+      <button class="tombol-bar" id="btn-ekspor" title="Ekspor & proyek">📤</button>
+    </nav>
   </header>
 
   <!-- ===== PANEL PENCARIAN ===== -->
@@ -393,9 +395,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=48"></script>
-  <script src="js/app.js?v=48"></script>
-  <script src="js/masuk.js?v=48"></script>
+  <script src="js/data.js?v=49"></script>
+  <script src="js/app.js?v=49"></script>
+  <script src="js/masuk.js?v=49"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

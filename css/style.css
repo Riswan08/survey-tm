@@ -34,10 +34,22 @@ body {
 #topbar .logo-img { width: 34px; height: 34px; border-radius: 8px; }
 #topbar .judul { font-weight: 700; font-size: 15px; line-height: 1.1; white-space: nowrap; }
 #topbar .judul small { display: block; font-weight: 400; font-size: 10px; opacity: .85; }
-@media (max-width: 480px) {
-  #topbar .judul { font-size: 13px; }
-  #topbar .judul small { display: none; }
-  .tombol-bar { padding: 6px 8px; font-size: 11px; }
+/* deretan menu topbar: satu baris, bisa digeser bila sempit */
+#menu-bar {
+  display: flex; align-items: center; gap: 8px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; max-width: 100%;
+}
+#menu-bar::-webkit-scrollbar { display: none; }
+#menu-bar .tombol-bar { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  #topbar { gap: 6px; padding: 0 6px; }
+  #topbar .judul { display: none; }       /* di HP: logo + deretan menu penuh */
+  #topbar .logo-img { width: 30px; height: 30px; }
+  #menu-bar { gap: 5px; }
+  .teks-bar { display: none; }             /* tombol jadi ikon saja agar semua muat */
+  .tombol-bar { padding: 7px 8px; font-size: 14px; }
+  #badge-offline { font-size: 9px; padding: 2px 5px; }
 }
 #topbar .spacer { flex: 1; }
 #badge-offline {

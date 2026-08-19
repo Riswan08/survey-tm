@@ -51,6 +51,23 @@ Ada dua cara — pilih salah satu:
   admin) — daftar hash di `js/data.js` (`KODE_AKSES`). Membuat kode baru: konsol
   browser → `await cakraHash('KODEBARU')` → tempel hash + `{ ulp, peran }`.
 
+## Akses dari mana saja (tunnel HTTPS)
+
+Agar **semua petugas & dasbor melihat database yang sama dari mana pun** —
+langsung dari aplikasi github.io, tanpa unduh/unggah file, tanpa harus satu WiFi:
+
+1. Pasang `cloudflared` sekali di komputer server (`brew install cloudflared`,
+   atau unduh dari rilis resmi Cloudflare).
+2. Jalankan server: `node server/cakra-server.js`
+3. Jalankan tunnel: `bash server/tunnel.sh` → muncul alamat
+   `https://....trycloudflare.com`
+4. Isi alamat itu ke **⚙️ Pengaturan → Alamat Server CAKRA** di semua perangkat
+   (kode unit sama). Selesai — simpan pekerjaan = langsung terbaca semua orang.
+
+Alamat quick-tunnel berganti tiap dijalankan ulang; untuk alamat permanen buat
+akun Cloudflare gratis dan pakai *named tunnel*. Karena server jadi terjangkau
+dari internet, pakai **kode unit yang panjang dan tidak mudah ditebak**.
+
 ## Keamanan & data
 
 - **Kode Unit** adalah kunci akses data bersama — gunakan kode yang tidak mudah
