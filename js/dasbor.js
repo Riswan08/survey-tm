@@ -79,13 +79,18 @@ function perluasanPerPekerjaan() {
   const hasil = {};
   const trKah = (p) => (KONSTRUKSI[p.konstruksi] || {}).grup === 'JTR';
   Object.entries(grup).forEach(([nama, daftar]) => {
-    // rute dipilah JTM / JTR per gawang (gawang JTR = salah satu ujungnya konstruksi TR)
+    // rute dihitung per PETUGAS di dalam pekerjaan — dua petugas dengan nama
+    // pekerjaan sama tidak saling tersambung; dipilah JTM/JTR per gawang
     let ruteJTM = 0, ruteJTR = 0;
-    for (let i = 1; i < daftar.length; i++) {
-      const d = jarakM(daftar[i - 1], daftar[i]);
-      if (d > 2000) continue; // bentang > 2 km = bukan satu rantai (lokasi berbeda) — dilewati
-      if (trKah(daftar[i - 1]) || trKah(daftar[i])) ruteJTR += d; else ruteJTM += d;
-    }
+    const perPetugas = {};
+    daftar.forEach(p => { const k = p.petugas || ''; (perPetugas[k] = perPetugas[k] || []).push(p); });
+    Object.values(perPetugas).forEach(sub => {
+      for (let i = 1; i < sub.length; i++) {
+        const d = jarakM(sub[i - 1], sub[i]);
+        if (d > 2000) continue; // bentang > 2 km = bukan satu rantai (lokasi berbeda) — dilewati
+        if (trKah(sub[i - 1]) || trKah(sub[i])) ruteJTR += d; else ruteJTM += d;
+      }
+    });
     let biaya = 0, mulai = 0, akhir = 0;
     daftar.forEach(p => {
       biaya += biayaTitikRencana(p);
@@ -438,7 +443,8 @@ function renderPeta() {
   // pekerjaan langsung terlihat di peta monitoring
   const grupRencana = {};
   poles.filter(p => p.mode === 'rencana').forEach(p => {
-    const k = p.pekerjaan || '(tanpa nama pekerjaan)';
+    // kunci + petugas: dua petugas tidak pernah tersambung walau nama pekerjaannya sama
+    const k = (p.pekerjaan || '(tanpa nama pekerjaan)') + '|' + (p.petugas || '');
     (grupRencana[k] = grupRencana[k] || []).push(p);
   });
   const trKahP = (p) => (KONSTRUKSI[p.konstruksi] || {}).grup === 'JTR';

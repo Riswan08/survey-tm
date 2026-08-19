@@ -356,9 +356,11 @@ function warnaSkor(skor) {
 // pekerjaan/petugas lain (hasil sinkronisasi unit) tidak digabung ke rute,
 // RAB, maupun live survey pekerjaan yang sedang dikerjakan.
 function grupRencanaPerPekerjaan() {
-  const grup = new Map(); // label pekerjaan -> daftar titik (urut simpan)
+  // kunci grup = PEKERJAAN + PETUGAS — dua petugas tidak pernah tersambung
+  // walau nama pekerjaannya sama / sama-sama kosong
+  const grup = new Map();
   state.poles.filter(p => !p.mode || p.mode === 'rencana').forEach(p => {
-    const k = p.pekerjaan || '';
+    const k = (p.pekerjaan || '') + '' + (p.petugas || '');
     if (!grup.has(k)) grup.set(k, []);
     grup.get(k).push(p);
   });
@@ -366,11 +368,13 @@ function grupRencanaPerPekerjaan() {
 }
 
 const polesRencana = () => {
-  // rantai AKTIF = pekerjaan pada Identitas Pekerjaan saat ini;
-  // titik tanpa label ikut serta (akan menerima label itu saat disimpan)
+  // rantai AKTIF = pekerjaan pada Identitas Pekerjaan saat ini, MILIK SENDIRI;
+  // titik tanpa label/petugas ikut serta (akan menerima identitas saat disimpan)
   const label = labelPekerjaan();
+  const saya = (state.settings.petugas || '').trim().toLowerCase();
   return state.poles.filter(p => (!p.mode || p.mode === 'rencana') &&
-    (!p.pekerjaan || p.pekerjaan === label));
+    (!p.pekerjaan || p.pekerjaan === label) &&
+    (!p.petugas || p.petugas.trim().toLowerCase() === saya));
 };
 
 function normalisasiKoreksi(daftar) {
@@ -805,8 +809,11 @@ function render() {
   // garis rute rencana per PEKERJAAN — pekerjaan/petugas berbeda tidak pernah
   // tersambung; label jarak hanya untuk pekerjaan yang sedang aktif
   const labelAktif = labelPekerjaan();
-  grupRencanaPerPekerjaan().forEach((daftar, label) => {
-    const aktif = !label || label === labelAktif;
+  const petugasSaya = (state.settings.petugas || '').trim().toLowerCase();
+  grupRencanaPerPekerjaan().forEach((daftar) => {
+    const labelG = daftar[0].pekerjaan || '';
+    const petugasG0 = (daftar[0].petugas || '').trim().toLowerCase();
+    const aktif = (!labelG || labelG === labelAktif) && (!petugasG0 || petugasG0 === petugasSaya);
     for (let i = 1; i < daftar.length; i++) {
       const a = daftar[i - 1], b = daftar[i];
       const d = haversine(a, b);
@@ -830,7 +837,7 @@ function render() {
       L.marker([tengah.lat, tengah.lng], {
         icon: L.divIcon({
           className: 'label-pekerjaan' + (aktif ? ' aktif' : ''),
-          html: `⚡ ${label || labelAktif || 'Pekerjaan tanpa nama'}` +
+          html: `⚡ ${labelG || labelAktif || 'Pekerjaan tanpa nama'}` +
             ((petugasG || ulpG) ? `<small>👤 ${petugasG || '—'}${ulpG ? ' · 🏢 ' + ulpG : ''}</small>` : ''),
           iconSize: null, iconAnchor: [0, 42],
         }),
@@ -2143,9 +2150,13 @@ function gabungStatusPekerjaanUnit(masuk) {
 
 function renderPerluasan() {
   const wadah = $('#isi-perluasan');
-  // SEMUA pekerjaan di proyek (termasuk milik petugas lain) — bukan hanya yang aktif
+  // SEMUA pekerjaan di proyek (termasuk milik petugas lain) — tiap petugas baris sendiri
   const grup = {};
-  grupRencanaPerPekerjaan().forEach((daftar, k) => { grup[k || '(tanpa nama pekerjaan)'] = daftar; });
+  grupRencanaPerPekerjaan().forEach((daftar) => {
+    const judul = daftar[0].pekerjaan || '(tanpa nama pekerjaan)';
+    const kunci = judul + (daftar[0].petugas ? ` — ${daftar[0].petugas}` : '');
+    grup[kunci] = daftar;
+  });
   const semuaNama = Object.keys(grup);
   if (!semuaNama.length) {
     wadah.innerHTML = `<p class="catatan-kecil">Belum ada titik rencana di proyek ini. Isi
@@ -2166,7 +2177,8 @@ function renderPerluasan() {
     }
     let biaya = 0;
     daftar.forEach(p => { biaya += biayaPerTiang(p).total; });
-    const stKey = (statusPekerjaanUnit[nama] || {}).status;
+    // tahap tersimpan per NAMA PEKERJAAN (tanpa embel-embel petugas)
+    const stKey = (statusPekerjaanUnit[daftar[0].pekerjaan || '(tanpa nama pekerjaan)'] || {}).status;
     const st = STATUS_PEKERJAAN[stKey] || STATUS_PEKERJAAN.survey;
     const div = document.createElement('div');
     div.className = 'item-tiang';
@@ -2401,13 +2413,14 @@ function eksporKML() {
       <Point><coordinates>${p.lng},${p.lat},0</coordinates></Point>
     </Placemark>`;
   }).join('');
-  // rute per PEKERJAAN (dipecah pada lompatan > 2 km) — tidak menyambung lintas pekerjaan
-  grupRencanaPerPekerjaan().forEach((daftar, label) => {
+  // rute per PEKERJAAN+PETUGAS (dipecah pada lompatan > 2 km) — tidak lintas pekerjaan/petugas
+  grupRencanaPerPekerjaan().forEach((daftar) => {
+    const namaRute = `${daftar[0].pekerjaan || 'Rencana Jaringan'}${daftar[0].petugas ? ' — ' + daftar[0].petugas : ''}`;
     let seg = daftar.length ? [daftar[0]] : [];
     const dorong = () => {
       if (seg.length > 1) {
         plek += `
-    <Placemark><name>Rute ${esc(label || 'Rencana Jaringan')}</name>
+    <Placemark><name>Rute ${esc(namaRute)}</name>
       <LineString><coordinates>${seg.map(p => `${p.lng},${p.lat},0`).join(' ')}</coordinates></LineString>
     </Placemark>`;
       }
