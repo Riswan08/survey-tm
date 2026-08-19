@@ -104,6 +104,26 @@ function gabungHarga(lama, masuk, riwayat) {
   return { harga: bersih, riwayat: log, berubah: true };
 }
 
+// tanda-hapus (tombstone): penghapusan titik ikut tersinkron ke semua perangkat.
+// Per uid, stempel terbaru menang; titik terhapus bila stempel hapus >= stempel titik
+// (titik yang DIEDIT SETELAH dihapus dianggap dihidupkan kembali).
+function gabungHapus(lama, masuk) {
+  const peta = new Map();
+  (lama || []).forEach(t => { if (t && typeof t.uid === 'string') peta.set(t.uid, t); });
+  (Array.isArray(masuk) ? masuk : []).forEach(t => {
+    if (!t || typeof t.uid !== 'string' || t.uid.length < 3) return;
+    const ada = peta.get(t.uid);
+    if (!ada || (Number(t.diubah) || 0) > (Number(ada.diubah) || 0)) {
+      peta.set(t.uid, {
+        uid: t.uid.slice(0, 40),
+        diubah: Number(t.diubah) || 0,
+        petugas: String(t.petugas || '').slice(0, 40),
+      });
+    }
+  });
+  return [...peta.values()].slice(-5000);
+}
+
 // tahap pekerjaan perluasan: per nama pekerjaan, stempel `diubah` terbaru menang
 function gabungStatusPekerjaan(lama, masuk) {
   const hasil = {};
@@ -182,6 +202,7 @@ http.createServer((req, res) => {
       const d = bacaUnit(kode);
       kirimJSON(res, 200, {
         poles: d.poles, koreksi: d.koreksi || [], tugas: d.tugas || [],
+        hapus: d.hapus || [],
         harga: d.harga || null, riwayatHarga: d.riwayatHarga || [],
         pekerjaanStatus: d.pekerjaanStatus || {},
         diperbarui: d.diperbarui,
@@ -204,8 +225,14 @@ http.createServer((req, res) => {
           const tugas = gabungTugas(lama.tugas, masuk.tugas);
           const h = gabungHarga(lama.harga, masuk.harga, lama.riwayatHarga);
           const pekerjaanStatus = gabungStatusPekerjaan(lama.pekerjaanStatus, masuk.pekerjaanStatus);
+          // terapkan tanda-hapus: titik yang dihapus tidak pernah kembali dari
+          // perangkat mana pun (kecuali diedit ulang SETELAH penghapusan)
+          const hapus = gabungHapus(lama.hapus, masuk.hapus);
+          const petaHapus = new Map(hapus.map(t => [t.uid, t.diubah]));
+          hasil.poles = hasil.poles.filter(p =>
+            !(petaHapus.has(p.uid) && petaHapus.get(p.uid) >= (Number(p.diubah) || 0)));
           tulisUnit(kode, {
-            poles: hasil.poles, koreksi, tugas,
+            poles: hasil.poles, koreksi, tugas, hapus,
             harga: h.harga || null, riwayatHarga: h.riwayat || [],
             pekerjaanStatus,
             diperbarui: Date.now(),

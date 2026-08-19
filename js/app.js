@@ -142,6 +142,7 @@ const DEVICE_ID = (() => {
 let state = {
   poles: [],                 // {id, nama, lat, lng, tiang, konstruksi, aksesoris:[], catatan}
   koreksi: [],               // koreksi sambungan: {a, b, aksi: 'tambah'|'hapus', diubah, petugas}
+  hapus: [],                 // tanda-hapus titik: {uid, diubah, petugas} — ikut tersinkron
   settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
 };
 let idBerikut = 1;
@@ -183,7 +184,7 @@ function toast(pesan) {
 
 function simpan() {
   try {
-    localStorage.setItem(kunciSimpan(), JSON.stringify({ poles: state.poles, koreksi: state.koreksi, settings: state.settings, idBerikut }));
+    localStorage.setItem(kunciSimpan(), JSON.stringify({ poles: state.poles, koreksi: state.koreksi, hapus: state.hapus, settings: state.settings, idBerikut }));
   } catch (e) {
     toast('⚠️ Penyimpanan HP hampir penuh — hapus sebagian foto atau ekspor proyek ke JSON');
   }
@@ -390,11 +391,23 @@ function normalisasiKoreksi(daftar) {
     }));
 }
 
+function normalisasiHapus(daftar) {
+  return (Array.isArray(daftar) ? daftar : [])
+    .filter(t => t && typeof t.uid === 'string' && t.uid.length >= 3)
+    .slice(-5000)
+    .map(t => ({
+      uid: t.uid.slice(0, 40),
+      diubah: isFinite(t.diubah) ? Number(t.diubah) : 0,
+      petugas: typeof t.petugas === 'string' ? t.petugas.slice(0, 40) : '',
+    }));
+}
+
 function normalisasiState(d) {
   const bawaan = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-  const hasil = { poles: [], koreksi: [], settings: bawaan };
+  const hasil = { poles: [], koreksi: [], hapus: [], settings: bawaan };
   if (!d || typeof d !== 'object') return hasil;
   hasil.koreksi = normalisasiKoreksi(d.koreksi);
+  hasil.hapus = normalisasiHapus(d.hapus);
 
   const idTerpakai = new Set();
   (Array.isArray(d.poles) ? d.poles : []).forEach((p, i) => {
@@ -439,6 +452,7 @@ function muat() {
   const bersih = normalisasiState(d);
   state.poles = bersih.poles;
   state.koreksi = bersih.koreksi;
+  state.hapus = bersih.hapus;
   state.settings = bersih.settings;
   idBerikut = Math.max(0, ...state.poles.map(p => p.id)) + 1;
 }
@@ -1450,14 +1464,22 @@ function simpanTiangDariForm() {
   tutupModal('modal-tiang');
 }
 
+function tandaiHapus(uid) {
+  // tanda-hapus ikut tersinkron ke database — titik hilang PERMANEN di semua
+  // perangkat, tidak muncul kembali saat sinkronisasi berikutnya
+  state.hapus = (state.hapus || []).filter(t => t.uid !== uid);
+  state.hapus.push({ uid, diubah: Date.now(), petugas: state.settings.petugas || '' });
+}
+
 function hapusTiang(id) {
   const p = state.poles.find(x => x.id === id);
   if (!p) return;
   if (!bolehUbahTitik(p)) { toast(`🔒 ${p.nama} dibuat oleh ${p.petugas} — hanya pembuat atau admin yang dapat menghapus`); return; }
-  if (!confirm(`Hapus tiang ${p.nama}?`)) return;
+  if (!confirm(`Hapus tiang ${p.nama}?\n(Terhapus dari database — hilang juga di perangkat semua petugas.)`)) return;
+  tandaiHapus(p.uid);
   state.poles = state.poles.filter(x => x.id !== id);
   simpan(); render(); renderDaftarTiang();
-  toast(`${p.nama} dihapus`);
+  toast(`${p.nama} dihapus dari database unit`);
 }
 
 // ---------------- GPS ----------------
@@ -2012,6 +2034,22 @@ function gabungPoles(masuk) {
   return { baru, diperbarui, total: state.poles.length };
 }
 
+// gabung tanda-hapus dari server + terapkan ke titik lokal
+function gabungDanTerapkanHapus(masuk) {
+  const peta = new Map((state.hapus || []).map(t => [t.uid, t]));
+  normalisasiHapus(masuk).forEach(t => {
+    const ada = peta.get(t.uid);
+    if (!ada || (t.diubah || 0) > (ada.diubah || 0)) peta.set(t.uid, t);
+  });
+  state.hapus = [...peta.values()];
+  const sebelum = state.poles.length;
+  state.poles = state.poles.filter(p => {
+    const t = peta.get(p.uid);
+    return !(t && t.diubah >= (p.diubah || 0)); // diedit SETELAH dihapus = hidup lagi
+  });
+  return sebelum - state.poles.length;
+}
+
 // gabung koreksi sambungan: per pasangan tiang, pemenang = `diubah` terbaru
 function gabungKoreksi(masuk) {
   const peta = new Map((state.koreksi || []).map(k => [kunciPasangan(k.a, k.b), k]));
@@ -2251,7 +2289,7 @@ async function kirimKeServer(senyap) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Kode-Unit': state.settings.kodeUnit },
       body: JSON.stringify({
-        poles: state.poles, koreksi: state.koreksi,
+        poles: state.poles, koreksi: state.koreksi, hapus: state.hapus,
         tugas: daftarTugas, harga: paketHargaKirim(),
       }),
     });
@@ -2279,6 +2317,7 @@ async function ambilDariServer(senyap) {
     if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
     const d = await res.json();
     const hasil = gabungPoles(d.poles);
+    gabungDanTerapkanHapus(d.hapus); // titik yang dihapus perangkat lain ikut hilang di sini
     gabungKoreksi(d.koreksi);
     const tugasBaru = gabungTugas(d.tugas);
     simpanTugas(); perbaruiBadgeTugas();
@@ -2589,13 +2628,16 @@ function imporTitikAset(file) {
 }
 
 function hapusSemua() {
-  if (!confirm('Hapus SEMUA tiang & koreksi sambungan, lalu mulai proyek baru?')) return;
-  state.poles = [];
+  const milik = state.poles.filter(p => bolehUbahTitik(p));
+  if (!confirm(`Kosongkan proyek ini?\n${milik.length} titik yang Anda berhak hapus akan DIHAPUS PERMANEN dari database unit `
+    + `(hilang di semua perangkat). Titik milik petugas lain tidak disentuh.`)) return;
+  milik.forEach(p => tandaiHapus(p.uid));
+  state.poles = state.poles.filter(p => !bolehUbahTitik(p));
   state.koreksi = [];
-  idBerikut = 1;
+  idBerikut = Math.max(0, ...state.poles.map(p => p.id)) + 1;
   simpan(); render();
   tutupModal('modal-ekspor');
-  toast('Proyek baru dimulai');
+  toast(`${milik.length} titik dihapus dari database unit`);
 }
 
 // ---------------- PENCARIAN LOKASI ----------------

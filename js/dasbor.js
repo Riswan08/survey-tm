@@ -1016,6 +1016,11 @@ async function ambilServer() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
     const hasil = gabung(d.poles);
+    // terapkan tanda-hapus: titik yang sudah dihapus tidak ditampilkan lagi
+    const petaHapus = new Map((d.hapus || []).map(t => [t.uid, Number(t.diubah) || 0]));
+    if (petaHapus.size) {
+      poles = poles.filter(p => !(petaHapus.has(p.uid) && petaHapus.get(p.uid) >= (p.diubah || 0)));
+    }
     gabungKoreksi(d.koreksi);
     const tugasBaru = gabungTugas(d.tugas);
     hargaTerpusat = d.harga || hargaTerpusat;
