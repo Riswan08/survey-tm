@@ -1889,6 +1889,9 @@ function renderPengaturan() {
   $('#s-petugas').value = s.petugas || '';
   $('#s-server').value = s.server || '';
   $('#s-unit').value = s.kodeUnit || '';
+  // kolom alamat server & kode unit hanya untuk admin (pintu darurat);
+  // petugas lapangan cukup melihat status — semuanya otomatis dari konfig.json
+  $('#s-lanjutan').classList.toggle('sembunyi', !(typeof bolehKelolaHarga === 'function' && bolehKelolaHarga()));
   perbaruiStatusSinkron();
 
   // identitas sesi (nama, ULP, peran) + keterangan hak harga
@@ -3163,7 +3166,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('online', perbaruiStatusSinkron);
   window.addEventListener('offline', perbaruiStatusSinkron);
 
-  // ekspor
+  // ekspor (simpan/buka file JSON dihapus — data real-time di database unit)
   $('#e-csv').onclick = eksporCSV;
   $('#e-kml').onclick = eksporKML;
   $('#e-pdf').onclick = () => { tutupModal('modal-ekspor'); bukaLembarGambar(); };
@@ -3185,8 +3188,6 @@ document.addEventListener('DOMContentLoaded', () => {
   ['#lg-judul', '#lg-lokasi', '#lg-digambar', '#lg-diperiksa', '#lg-disetujui', '#lg-nomor']
     .forEach(sel => { $(sel).oninput = perbaruiKopLembar; });
   $('#e-tile').onclick = unduhTileArea;
-  $('#e-json').onclick = eksporJSON;
-  $('#e-impor').onchange = (e) => { if (e.target.files[0]) imporJSON(e.target.files[0]); e.target.value = ''; };
   $('#e-hapus').onclick = hapusSemua;
 
   // tautan cepat lembar cetak: index.html?cetak=rab / ?cetak=gambar

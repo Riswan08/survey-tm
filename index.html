@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=54">
+  <link rel="stylesheet" href="css/style.css?v=55">
 </head>
 <body>
 
@@ -237,20 +237,22 @@
         <p class="catatan-kecil" style="margin-top:-6px;margin-bottom:12px">Identitas ini menempel otomatis pada semua
           titik proyek ini — begitu disimpan, pekerjaannya langsung tampil di database &amp; dasbor monitoring.</p>
 
-        <div class="judul-seksi">Sinkronisasi Terpusat (opsional)</div>
-        <div class="form-grup"><label>Nama Petugas / Surveyor</label>
-          <input type="text" id="s-petugas" maxlength="40" placeholder="mis. Riswan — tercatat di tiap titik"></div>
-        <div class="form-baris">
-          <div class="form-grup"><label>Alamat Server CAKRA</label>
-            <input type="text" id="s-server" placeholder="http://192.168.1.10:8787"></div>
-          <div class="form-grup"><label>Kode Unit</label>
-            <input type="text" id="s-unit" placeholder="UP3-MASOHI"></div>
-        </div>
+        <div class="judul-seksi">Petugas &amp; Database</div>
+        <div class="form-grup"><label>Nama Petugas / Surveyor (wajib — tercatat di tiap titik)</label>
+          <input type="text" id="s-petugas" maxlength="40" placeholder="mis. Riswan"></div>
         <p class="catatan-kecil" id="s-status-sinkron" style="margin-bottom:8px;font-weight:700"></p>
         <button class="tombol polos" id="s-sinkron" style="width:100%;margin-bottom:6px">🔄 Sinkronkan Sekarang (bila perlu)</button>
-        <p class="catatan-kecil">Setelah alamat server &amp; kode unit terisi, <b>cukup SIMPAN pekerjaan</b> —
-        semua titik &amp; usulan terkirim sendiri ke database unit dan langsung terbaca di Dasbor.
-        Kode unit hanya huruf/angka/<code>-</code>/<code>_</code> (tanpa spasi), sama untuk semua perangkat.</p>
+        <p class="catatan-kecil">Database tersambung otomatis — <b>cukup SIMPAN pekerjaan</b>, semua titik &amp;
+        usulan langsung terbaca seluruh petugas dan Dasbor.</p>
+        <div id="s-lanjutan" class="sembunyi">
+          <p class="catatan-kecil" style="font-weight:700;margin-top:8px">⚙️ Lanjutan (admin) — biarkan kosong agar ikut otomatis:</p>
+          <div class="form-baris">
+            <div class="form-grup"><label>Alamat Server CAKRA</label>
+              <input type="text" id="s-server" placeholder="otomatis dari konfig.json"></div>
+            <div class="form-grup"><label>Kode Unit</label>
+              <input type="text" id="s-unit" placeholder="otomatis"></div>
+          </div>
+        </div>
 
         <div class="judul-seksi">Harga Satuan (bisa diubah, tersimpan di perangkat)</div>
         <p class="catatan-kecil" id="s-ket-harga" style="margin-bottom:8px"></p>
@@ -303,13 +305,8 @@
               <input type="file" id="e-impor-kml" accept=".kml,.csv,.txt" hidden></label></div>
         </div>
         <p class="catatan-kecil" style="margin-bottom:10px">KML: semua Placemark bertitik. CSV: kolom lat/latitude &amp; lng/lon/longitude (pemisah <code>;</code> atau <code>,</code>), kolom nama opsional.</p>
-        <div class="judul-seksi">Simpan / Buka Proyek (file)</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <button class="tombol polos" id="e-json">💾 Simpan Proyek (file JSON)</button>
-          <label class="tombol polos" style="text-align:center">📂 Buka Proyek (JSON)
-            <input type="file" id="e-impor" accept=".json" hidden></label>
-          <button class="tombol bahaya" id="e-hapus">🗑 Kosongkan Proyek Aktif</button>
-        </div>
+        <button class="tombol bahaya" id="e-hapus" style="width:100%">🗑 Kosongkan Proyek Aktif</button>
+        <p class="catatan-kecil">Data tersimpan real-time di database unit — tidak perlu simpan/buka file apa pun.</p>
       </div>
       <div class="modal-kaki">
         <button class="tombol polos" data-tutup="modal-ekspor">Tutup</button>
@@ -395,9 +392,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=54"></script>
-  <script src="js/app.js?v=54"></script>
-  <script src="js/masuk.js?v=54"></script>
+  <script src="js/data.js?v=55"></script>
+  <script src="js/app.js?v=55"></script>
+  <script src="js/masuk.js?v=55"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
