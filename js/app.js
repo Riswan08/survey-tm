@@ -2686,6 +2686,87 @@ function togglePanelCari() {
   else if (markerCari) { map.removeLayer(markerCari); markerCari = null; }
 }
 
+// ---------------- UNDUH SEMUA PEKERJAAN (EXCEL — khusus admin) ----------------
+// Mengambil SELURUH database unit dari server (semua petugas, semua pekerjaan)
+// lalu mengunduhnya sebagai CSV ber-BOM yang terbuka rapi di Excel:
+// A) rekap per pekerjaan, B) rincian semua titik.
+async function unduhSemuaPekerjaan() {
+  if (!(typeof bolehKelolaHarga === 'function' && bolehKelolaHarga())) { toast('Fitur khusus admin'); return; }
+  toast('⬇️ Mengambil seluruh database unit…');
+  let semuaPoles = state.poles, statusPkj = statusPekerjaanUnit;
+  try {
+    const res = await fetch(urlServer() + '/api/data', { headers: { 'X-Kode-Unit': state.settings.kodeUnit } });
+    if (res.ok) {
+      const d = await res.json();
+      if (Array.isArray(d.poles) && d.poles.length) semuaPoles = d.poles;
+      if (d.pekerjaanStatus) statusPkj = d.pekerjaanStatus;
+    }
+  } catch (e) { toast('Server tidak terjangkau — memakai data di perangkat ini'); }
+
+  const B = [];
+  const baris = (...k) => B.push(k.map(v => String(v ?? '').replace(/;/g, ',').replace(/\n/g, ' ')).join(';'));
+  const tgl = (ts) => (ts ? new Date(ts).toLocaleString('id-ID') : '');
+  const trKah = (p) => (KONSTRUKSI[p.konstruksi] || {}).grup === 'JTR';
+
+  baris('Si CAKRA - SEMUA PEKERJAAN UNIT');
+  baris('Diunduh', new Date().toLocaleString('id-ID'), 'oleh', state.settings.petugas || '');
+  baris('');
+  baris('A. REKAP PER PEKERJAAN');
+  baris('Nama Pekerjaan', 'ULP', 'Petugas', 'Tahap', 'Tiang Rencana', 'JTM', 'JTR', 'Rute (m)',
+    'Biaya Konstruksi (Rp)', 'Usulan Perbaikan', 'Usulan Selesai', 'Nilai Usulan (Rp)',
+    'Calon Pelanggan', 'Terakhir Disimpan');
+  const grup = {};
+  semuaPoles.forEach(p => {
+    const k = p.pekerjaan || '(tanpa nama pekerjaan)';
+    (grup[k] = grup[k] || []).push(p);
+  });
+  Object.entries(grup).forEach(([nama, daftar]) => {
+    const rencana = daftar.filter(p => !p.mode || p.mode === 'rencana');
+    // rute dihitung per petugas — dua petugas tidak pernah dianggap satu rantai
+    let rute = 0;
+    const perPetugas = {};
+    rencana.forEach(p => { const k = p.petugas || ''; (perPetugas[k] = perPetugas[k] || []).push(p); });
+    Object.values(perPetugas).forEach(sub => {
+      for (let i = 1; i < sub.length; i++) {
+        const d = haversine(sub[i - 1], sub[i]);
+        if (d <= 2000) rute += d;
+      }
+    });
+    let biaya = 0;
+    rencana.forEach(p => { try { biaya += biayaPerTiang(p).total; } catch (e) { /* konstruksi tak dikenal */ } });
+    let usulan = 0, selesai = 0, nilai = 0;
+    daftar.forEach(p => (p.usulan || []).forEach(u => {
+      usulan++; if (u.status === 'selesai') selesai++; nilai += biayaPaket(u.paket).total;
+    }));
+    const st = STATUS_PEKERJAAN[(statusPkj[nama] || {}).status] || STATUS_PEKERJAAN.survey;
+    baris(nama,
+      [...new Set(daftar.map(p => p.ulp).filter(Boolean))].join(', '),
+      [...new Set(daftar.map(p => p.petugas).filter(Boolean))].join(', '),
+      `${st.nama} (${st.persen}%)`,
+      rencana.length, rencana.filter(p => !trKah(p)).length, rencana.filter(trKah).length,
+      Math.round(rute), Math.round(biaya), usulan, selesai, Math.round(nilai),
+      daftar.filter(p => p.mode === 'pelanggan').length,
+      tgl(Math.max(0, ...daftar.map(p => p.diubah || 0))));
+  });
+  baris('');
+  baris('B. RINCIAN SEMUA TITIK');
+  baris('Nama Titik', 'Pekerjaan', 'Petugas', 'ULP', 'Mode', 'Jenis / Konstruksi', 'Kondisi',
+    'Latitude', 'Longitude', 'Usulan (status)', 'Catatan', 'Disimpan');
+  semuaPoles.forEach(p => {
+    const jenis = p.mode === 'eksisting'
+      ? ((JENIS_ASET[p.jenisAset] || {}).nama || p.jenisAset || '')
+      : p.mode === 'pelanggan' ? `Calon pelanggan: ${p.namaPelanggan || ''}` : (p.konstruksi || '');
+    const us = (p.usulan || []).map(u =>
+      `${(PAKET_PERBAIKAN[u.paket] || {}).nama || u.paket} [${(STATUS_USULAN[u.status] || {}).nama || u.status}]`).join(' + ');
+    baris(p.nama || '', p.pekerjaan || '', p.petugas || '', p.ulp || '', p.mode || 'rencana', jenis,
+      p.mode === 'eksisting' ? ((KONDISI[p.kondisi] || {}).nama || '') : '',
+      p.lat, p.lng, us, p.catatan || '', tgl(p.diubah));
+  });
+
+  unduh('SiCAKRA-Semua-Pekerjaan.csv', '﻿' + B.join('\n'), 'text/csv;charset=utf-8');
+  toast(`📊 ${semuaPoles.length} titik dari ${Object.keys(grup).length} pekerjaan diunduh — buka di Excel`);
+}
+
 // ---------------- LEMBAR GAMBAR RENCANA (CETAK / PDF) ----------------
 // Gambar rencana bergaya template unit: citra satelit + jaringan berwarna
 // (eksisting hitam, rencana baru biru, rehab hijau), lencana konstruksi per
@@ -3157,6 +3238,7 @@ document.addEventListener('DOMContentLoaded', () => {
     simpan();
     perbaruiStatusSinkron();
   };
+  $('#s-unduh-excel').onclick = unduhSemuaPekerjaan; // khusus admin (tombolnya pun hanya tampil untuk admin)
   // sinkron manual hanya sebagai cadangan — normalnya cukup SIMPAN, semuanya otomatis
   $('#s-sinkron').onclick = async () => {
     terapkanIsianSync();

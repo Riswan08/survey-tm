@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=55">
+  <link rel="stylesheet" href="css/style.css?v=56">
 </head>
 <body>
 
@@ -245,7 +245,12 @@
         <p class="catatan-kecil">Database tersambung otomatis — <b>cukup SIMPAN pekerjaan</b>, semua titik &amp;
         usulan langsung terbaca seluruh petugas dan Dasbor.</p>
         <div id="s-lanjutan" class="sembunyi">
-          <p class="catatan-kecil" style="font-weight:700;margin-top:8px">⚙️ Lanjutan (admin) — biarkan kosong agar ikut otomatis:</p>
+          <p class="catatan-kecil" style="font-weight:700;margin-top:8px">⚙️ Lanjutan (admin)</p>
+          <button class="tombol utama" id="s-unduh-excel" style="width:100%;margin-bottom:10px">
+            📊 Unduh Semua Pekerjaan — Excel (seluruh database unit)</button>
+          <p class="catatan-kecil" style="margin-top:-4px">Rekap per pekerjaan (tiang, rute, biaya, tahap, usulan,
+            calon pelanggan) + rincian semua titik dari seluruh petugas.</p>
+          <p class="catatan-kecil" style="font-weight:700">Alamat server — biarkan kosong agar ikut otomatis:</p>
           <div class="form-baris">
             <div class="form-grup"><label>Alamat Server CAKRA</label>
               <input type="text" id="s-server" placeholder="otomatis dari konfig.json"></div>
@@ -392,9 +397,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=55"></script>
-  <script src="js/app.js?v=55"></script>
-  <script src="js/masuk.js?v=55"></script>
+  <script src="js/data.js?v=56"></script>
+  <script src="js/app.js?v=56"></script>
+  <script src="js/masuk.js?v=56"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
