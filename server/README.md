@@ -77,3 +77,22 @@ dari internet, pakai **kode unit yang panjang dan tidak mudah ditebak**.
   di belakang reverse proxy ber-HTTPS (minta bantuan tim IT).
 - Penggabungan anti-duplikat: setiap titik punya `uid` unik per perangkat; jika titik
   yang sama diubah dua orang, versi dengan stempel waktu terbaru yang menang.
+
+## Pemasangan di VPS (disarankan untuk operasional harian)
+
+VPS murah (1 vCPU / 1 GB, Ubuntu 24.04, mis. DomaiNesia Jakarta) + domain =
+alamat permanen, hidup 24 jam, tidak tergantung komputer kantor.
+
+1. Arahkan DNS **A record** domain → IP VPS (di panel DomaiNesia).
+2. SSH ke VPS sebagai root, lalu:
+   ```
+   curl -sO https://raw.githubusercontent.com/Riswan08/survey-tm/main/server/pasang-vps.sh
+   export DOMAIN=namadomainanda
+   bash pasang-vps.sh
+   ```
+3. Ubah `konfig.json` di repo: `"server": "https://namadomainanda"` → commit & push.
+   Sekali saja — semua perangkat tersambung otomatis selamanya.
+4. (Bila ada) migrasi data lama: `scp server/data/*.json root@VPS:/opt/sicakra/server/data/`
+
+Skrip memasang Node, layanan systemd (auto-start/restart), Caddy (HTTPS otomatis),
+dan firewall dasar. Setelah VPS aktif, tunnel di komputer kantor tidak diperlukan lagi.
