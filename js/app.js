@@ -187,6 +187,7 @@ function simpan() {
   } catch (e) {
     toast('⚠️ Penyimpanan HP hampir penuh — hapus sebagian foto atau ekspor proyek ke JSON');
   }
+  sinkronTertunda = true;     // ditandai sampai benar-benar diterima server
   jadwalkanSinkronOtomatis(); // setiap pekerjaan/usulan langsung mengalir ke database unit
 }
 
@@ -196,6 +197,7 @@ function simpan() {
 // otomatis (senyap, dijeda 4 dtk) — pekerjaan & usulan langsung terbaca di
 // database unit untuk monitoring, tanpa tombol kirim/unduh manual.
 let timerSinkron = null;
+let sinkronTertunda = false; // ada perubahan yang belum diterima server (dicoba ulang berkala)
 let waktuSinkronTerakhir = Number(localStorage.getItem('cakra_sinkron_terakhir')) || 0;
 
 function catatSinkron() {
@@ -230,6 +232,8 @@ function perbaruiStatusSinkron() {
     el.textContent = pesanCampuran();
   } else if (navigator.onLine === false) {
     el.textContent = '🟡 Offline — perubahan aman di HP, terkirim sendiri begitu online.';
+  } else if (sinkronTertunda) {
+    el.textContent = '🟠 Ada perubahan yang belum diterima server — dikirim ulang otomatis tiap menit.';
   } else {
     el.textContent = '🟢 Sinkron otomatis AKTIF — setiap simpan langsung terkirim ke database unit'
       + (waktuSinkronTerakhir ? ` (terakhir ${new Date(waktuSinkronTerakhir).toLocaleTimeString('id-ID')})` : '') + '.';
@@ -2238,6 +2242,7 @@ async function kirimKeServer(senyap) {
     });
     if (!res.ok) throw new Error('server menolak (HTTP ' + res.status + ')');
     const d = await res.json();
+    sinkronTertunda = false; // semua perubahan sudah diterima server
     catatSinkron();
     if (!senyap) toast(`✅ Terkirim — server kini menyimpan ${d.total} titik unit ini`
       + (d.hargaBerubah ? ' · harga terpusat diperbarui' : ''));
@@ -3058,6 +3063,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // konfigurasi otomatis dari konfig.json, lalu tarik data unit —
   // pengguna tidak perlu mengetik alamat server / kode unit
   muatKonfigOtomatis().then(() => { if (sinkronSiap()) ambilDariServer(true); });
+  // sinkron berkelanjutan selama aplikasi terbuka:
+  // - perubahan yang gagal terkirim dicoba ulang tiap menit
+  // - data petugas lain ditarik tiap 90 dtk (tanpa perlu menutup/membuka aplikasi)
+  // - konfig (alamat server terbaru) dimuat ulang tiap 5 menit
+  setInterval(() => { if (sinkronTertunda && sinkronSiap()) kirimKeServer(true); }, 60000);
+  setInterval(() => { if (sinkronSiap()) ambilDariServer(true); }, 90000);
+  setInterval(muatKonfigOtomatis, 300000);
   window.addEventListener('online', () => {
     if (sinkronSiap()) { ambilDariServer(true); jadwalkanSinkronOtomatis(); }
   });
