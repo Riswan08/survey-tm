@@ -368,6 +368,33 @@ function grupRencanaPerPekerjaan() {
   return grup;
 }
 
+// RUTE BERBENTUK POHON (mendukung percabangan): tiap titik tersambung ke titik
+// TERDEKAT yang ditaging lebih dulu di pekerjaan yang sama — bukan selalu titik
+// terakhir. Jalan lurus tetap berurutan; cabang menyambung ke tiang percabangan.
+function sisiRantai(daftar, maks = 2000) {
+  const sisi = []; // { a: induk, b: titik, d: jarak }
+  for (let i = 1; i < daftar.length; i++) {
+    let induk = null, jarakMin = Infinity;
+    for (let j = 0; j < i; j++) {
+      const d = haversine(daftar[j], daftar[i]);
+      if (d < jarakMin) { jarakMin = d; induk = daftar[j]; }
+    }
+    if (induk && jarakMin <= maks) sisi.push({ a: induk, b: daftar[i], d: jarakMin });
+  }
+  return sisi;
+}
+
+// titik rantai aktif yang TERDEKAT dari suatu posisi (untuk live survey & pemeriksaan gawang)
+function tiangTerdekatDari(pos, kecualiId) {
+  let terdekat = null, jarakMin = Infinity;
+  polesRencana().forEach(p => {
+    if (kecualiId !== undefined && p.id === kecualiId) return;
+    const d = haversine(p, pos);
+    if (d < jarakMin) { jarakMin = d; terdekat = p; }
+  });
+  return terdekat ? { pole: terdekat, jarak: jarakMin } : null;
+}
+
 const polesRencana = () => {
   // rantai AKTIF = pekerjaan pada Identitas Pekerjaan saat ini, MILIK SENDIRI;
   // titik tanpa label/petugas ikut serta (akan menerima identitas saat disimpan)
@@ -474,12 +501,12 @@ function namaBerikut(awalan = 'T') {
 // hanya untuk titik rencana (rantai jaringan); aset eksisting bebas posisinya.
 function periksaGawang(p, kecualiId) {
   if (p.mode === 'eksisting' || p.mode === 'pelanggan') return true;
-  const lainnya = polesRencana().filter(x => x.id !== kecualiId);
-  const akhir = lainnya[lainnya.length - 1];
-  if (!akhir) return true;
-  const d = haversine(akhir, p);
-  if (d < 3) return confirm(`⚠️ Tiang ini hanya ${angka(d, 1)} m dari ${akhir.nama} — kemungkinan ketuk ganda atau GPS belum stabil.\n\nTetap simpan?`);
-  if (d > 250) return confirm(`⚠️ Jarak ke ${akhir.nama} = ${angka(d, 0)} m — jauh di atas gawang normal (±50 m). Periksa apakah tikor benar.\n\nTetap simpan?`);
+  // dibandingkan dengan titik TERDEKAT (induk sambungannya) — mendukung percabangan
+  const dekat = tiangTerdekatDari(p, kecualiId);
+  if (!dekat) return true;
+  const d = dekat.jarak, nama = dekat.pole.nama;
+  if (d < 3) return confirm(`⚠️ Tiang ini hanya ${angka(d, 1)} m dari ${nama} — kemungkinan ketuk ganda atau GPS belum stabil.\n\nTetap simpan?`);
+  if (d > 250) return confirm(`⚠️ Jarak ke titik terdekat (${nama}) = ${angka(d, 0)} m — jauh di atas gawang normal (±50 m). Periksa apakah tikor benar.\n\nTetap simpan?`);
   return true;
 }
 
@@ -853,10 +880,8 @@ function render() {
     const labelG = daftar[0].pekerjaan || '';
     const petugasG0 = (daftar[0].petugas || '').trim().toLowerCase();
     const aktif = (!labelG || labelG === labelAktif) && (!petugasG0 || petugasG0 === petugasSaya);
-    for (let i = 1; i < daftar.length; i++) {
-      const a = daftar[i - 1], b = daftar[i];
-      const d = haversine(a, b);
-      if (d > 2000) continue; // lompatan antar lokasi — bukan satu bentangan
+    // sisi pohon: tiap titik ke titik terdekat sebelumnya — percabangan tergambar benar
+    sisiRantai(daftar).forEach(({ a, b, d }) => {
       L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
         color: '#0c6bb5', weight: aktif ? 3 : 2, dashArray: '6 4', opacity: aktif ? 1 : .55,
       }).addTo(layerGaris);
@@ -866,7 +891,7 @@ function render() {
           interactive: false,
         }).addTo(layerGaris);
       }
-    }
+    });
     // papan nama pekerjaan di peta — petugas/role lain langsung tahu ini
     // pekerjaan apa, jenisnya apa, siapa & dari unit mana
     if (daftar.length) {
@@ -1037,10 +1062,8 @@ function biayaPerTiang(pole) {
 }
 
 function panjangRute() {
-  const rencana = polesRencana();
-  let total = 0;
-  for (let i = 1; i < rencana.length; i++) total += haversine(rencana[i - 1], rencana[i]);
-  return total; // meter
+  // total panjang sisi pohon rute (termasuk cabang) — bukan rantai lurus
+  return sisiRantai(polesRencana()).reduce((jml, s) => jml + s.d, 0); // meter
 }
 
 function hitungRAB() {
@@ -1629,9 +1652,10 @@ function terimaPosisiLive(lat, lng, akurasi) {
     if (ikutiPeta) map.panTo([lat, lng]);
   }
 
-  // garis bantu putus-putus dari tiang rencana terakhir ke posisi sekarang
-  const rencanaLive = polesRencana();
-  const akhir = rencanaLive[rencanaLive.length - 1];
+  // garis bantu putus-putus dari tiang TERDEKAT ke posisi sekarang —
+  // saat menyusuri percabangan, garis mengikuti tiang cabang, bukan ujung rute
+  const dekatLive = tiangTerdekatDari({ lat, lng });
+  const akhir = dekatLive ? dekatLive.pole : null;
   if (akhir) {
     const seg = [[akhir.lat, akhir.lng], [lat, lng]];
     if (!garisKeTiang) garisKeTiang = L.polyline(seg, { color: '#2e7d32', weight: 2, dashArray: '4 7' }).addTo(layerGps);
@@ -1646,8 +1670,8 @@ function terimaPosisiLive(lat, lng, akurasi) {
 
 function perbaruiPanelLive() {
   const rencana = polesRencana();
-  const akhir = rencana[rencana.length - 1];
-  const jarak = (akhir && posisiLive) ? haversine(akhir, posisiLive) : null;
+  const dekat = posisiLive ? tiangTerdekatDari(posisiLive) : null;
+  const jarak = dekat ? dekat.jarak : null;
   const elJarak = $('#lv-jarak');
   elJarak.textContent = jarak === null ? '—' : angka(jarak, 0) + ' m';
   elJarak.classList.toggle('ideal', jarak !== null && jarak >= 45 && jarak <= 65); // gawang ideal 45–65 m
@@ -1822,13 +1846,18 @@ function renderRAB() {
   html += `<div class="judul-seksi">Rincian Per Tiang (Rencana)</div>`;
   if (rincianRencana.length) {
     html += `<div class="bungkus-tabel"><table class="rab">
-      <tr><th>Tiang</th><th>Konstruksi</th><th class="angka">Jarak dari Sebelumnya</th><th class="angka">Kumulatif</th><th class="angka">Biaya Titik</th></tr>`;
+      <tr><th>Tiang</th><th>Konstruksi</th><th class="angka">Gawang (dari tiang induk)</th><th class="angka">Kumulatif</th><th class="angka">Biaya Titik</th></tr>`;
     let kumulatif = 0;
     rincianRencana.forEach((p, i) => {
-      const d = i === 0 ? 0 : haversine(rincianRencana[i - 1], p);
+      // induk = titik terdekat yang ditaging lebih dulu (mendukung percabangan)
+      let d = 0, induk = '';
+      for (let j = 0; j < i; j++) {
+        const dd = haversine(rincianRencana[j], p);
+        if (!induk || dd < d) { d = dd; induk = rincianRencana[j].nama; }
+      }
       kumulatif += d;
       html += `<tr><td>${p.nama}</td><td>${p.konstruksi} — ${(KONSTRUKSI[p.konstruksi] || {}).nama || ''}</td>
-        <td class="angka">${i === 0 ? '—' : angka(d, 0) + ' m'}</td>
+        <td class="angka">${i === 0 ? '—' : angka(d, 0) + ' m (' + induk + ')'}</td>
         <td class="angka">${angka(kumulatif, 0)} m</td>
         <td class="angka">${rupiah(biayaPerTiang(p).total)}</td></tr>`;
     });
@@ -2471,11 +2500,16 @@ function eksporCSV() {
   baris('GRAND TOTAL', '', '', '', Math.round(rab.grandTotal));
   baris('');
   baris('RINCIAN PER TIANG (RENCANA)');
-  baris('Nama', 'Konstruksi', 'Jenis Tiang', 'Latitude', 'Longitude', 'Jarak dari sebelumnya (m)', 'Kumulatif (m)', 'Aksesoris', 'Catatan', 'Biaya Titik');
+  baris('Nama', 'Konstruksi', 'Jenis Tiang', 'Latitude', 'Longitude', 'Gawang dari tiang induk (m)', 'Kumulatif (m)', 'Aksesoris', 'Catatan', 'Biaya Titik');
   const rencanaCSV = polesRencana();
   let kumulatif = 0;
   rencanaCSV.forEach((p, i) => {
-    const d = i === 0 ? 0 : haversine(rencanaCSV[i - 1], p);
+    // induk = titik terdekat yang ditaging lebih dulu (mendukung percabangan)
+    let d = 0;
+    for (let j = 0; j < i; j++) {
+      const dd = haversine(rencanaCSV[j], p);
+      if (j === 0 || dd < d) d = dd;
+    }
     kumulatif += d;
     baris(p.nama.replace(/;/g, ','), p.konstruksi, MATERIALS[p.tiang].nama, p.lat, p.lng,
       Math.round(d), Math.round(kumulatif),
@@ -2548,23 +2582,15 @@ function eksporKML() {
       <Point><coordinates>${p.lng},${p.lat},0</coordinates></Point>
     </Placemark>`;
   }).join('');
-  // rute per PEKERJAAN+PETUGAS (dipecah pada lompatan > 2 km) — tidak lintas pekerjaan/petugas
+  // rute per PEKERJAAN+PETUGAS berbentuk pohon (mendukung percabangan) —
+  // tiap sisi jadi garis sendiri dalam satu MultiGeometry
   grupRencanaPerPekerjaan().forEach((daftar) => {
+    const sisi = sisiRantai(daftar);
+    if (!sisi.length) return;
     const namaRute = `${daftar[0].pekerjaan || 'Rencana Jaringan'}${daftar[0].petugas ? ' — ' + daftar[0].petugas : ''}`;
-    let seg = daftar.length ? [daftar[0]] : [];
-    const dorong = () => {
-      if (seg.length > 1) {
-        plek += `
-    <Placemark><name>Rute ${esc(namaRute)}</name>
-      <LineString><coordinates>${seg.map(p => `${p.lng},${p.lat},0`).join(' ')}</coordinates></LineString>
-    </Placemark>`;
-      }
-    };
-    for (let i = 1; i < daftar.length; i++) {
-      if (haversine(daftar[i - 1], daftar[i]) > 2000) { dorong(); seg = [daftar[i]]; }
-      else seg.push(daftar[i]);
-    }
-    dorong();
+    plek += `
+    <Placemark><name>Rute ${esc(namaRute)}</name><MultiGeometry>${sisi.map(s =>
+      `<LineString><coordinates>${s.a.lng},${s.a.lat},0 ${s.b.lng},${s.b.lat},0</coordinates></LineString>`).join('')}</MultiGeometry></Placemark>`;
   });
   const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Si CAKRA — Survey Aset Distribusi</name>${plek}
@@ -2995,9 +3021,8 @@ function gambarLembar() {
   // rute rencana per gawang: SUTR (konstruksi JTR) putus-putus, SUTM utuh + label jarak
   const rencana = polesRencana();
   let adaSUTR = false, adaSUTM = segmenEks.length > 0; // jaringan eksisting = SUTM
-  for (let i = 1; i < rencana.length; i++) {
-    const a = rencana[i - 1], b = rencana[i];
-    if (haversine(a, b) > 2000) continue; // lompatan antar lokasi — bukan satu bentangan
+  // sisi pohon rute — percabangan tergambar benar (titik ke titik terdekat sebelumnya)
+  sisiRantai(rencana).forEach(({ a, b, d }) => {
     const segTR = konstruksiTR(a.konstruksi) || konstruksiTR(b.konstruksi);
     if (segTR) adaSUTR = true; else adaSUTM = true;
     L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
@@ -3008,12 +3033,12 @@ function gambarLembar() {
     const dirJ = arahLayar(a, b);
     L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
       icon: L.divIcon({
-        className: 'lg-jarak', html: `${angka(haversine(a, b), 0)}`, iconSize: null,
+        className: 'lg-jarak', html: `${angka(d, 0)}`, iconSize: null,
         iconAnchor: [13 - dirJ.y * 20, 8 + dirJ.x * 20],
       }),
       interactive: false,
     }).addTo(layerLembar);
-  }
+  });
 
   // sambungan suplai dari jaringan eksisting
   const suplai = suplaiTerdekat();

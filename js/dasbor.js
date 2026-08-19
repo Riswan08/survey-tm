@@ -53,6 +53,21 @@ function jarakM(a, b) {
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
+// sisi pohon rute: tiap titik tersambung ke titik TERDEKAT yang ditaging lebih
+// dulu — percabangan terhitung & tergambar benar (sama dengan aplikasi survey)
+function sisiRantaiD(daftar, maks = 2000) {
+  const sisi = [];
+  for (let i = 1; i < daftar.length; i++) {
+    let induk = null, jarakMin = Infinity;
+    for (let j = 0; j < i; j++) {
+      const d = jarakM(daftar[j], daftar[i]);
+      if (d < jarakMin) { jarakMin = d; induk = daftar[j]; }
+    }
+    if (induk && jarakMin <= maks) sisi.push({ a: induk, b: daftar[i], d: jarakMin });
+  }
+  return sisi;
+}
+
 // biaya satu tiang rencana: batang tiang + BOM konstruksi + aksesoris + jasa tanam
 function biayaTitikRencana(p) {
   let total = 0;
@@ -85,11 +100,9 @@ function perluasanPerPekerjaan() {
     const perPetugas = {};
     daftar.forEach(p => { const k = p.petugas || ''; (perPetugas[k] = perPetugas[k] || []).push(p); });
     Object.values(perPetugas).forEach(sub => {
-      for (let i = 1; i < sub.length; i++) {
-        const d = jarakM(sub[i - 1], sub[i]);
-        if (d > 2000) continue; // bentang > 2 km = bukan satu rantai (lokasi berbeda) — dilewati
-        if (trKah(sub[i - 1]) || trKah(sub[i])) ruteJTR += d; else ruteJTM += d;
-      }
+      sisiRantaiD(sub).forEach(({ a, b, d }) => {
+        if (trKah(a) || trKah(b)) ruteJTR += d; else ruteJTM += d;
+      });
     });
     let biaya = 0, mulai = 0, akhir = 0;
     daftar.forEach(p => {
@@ -449,14 +462,12 @@ function renderPeta() {
   });
   const trKahP = (p) => (KONSTRUKSI[p.konstruksi] || {}).grup === 'JTR';
   Object.values(grupRencana).forEach(daftar => {
-    for (let i = 1; i < daftar.length; i++) {
-      const a = daftar[i - 1], b = daftar[i];
-      if (jarakM(a, b) > 2000) continue;
+    sisiRantaiD(daftar).forEach(({ a, b }) => {
       L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
         color: '#1e88e5', weight: 3.5, opacity: .9,
         dashArray: (trKahP(a) || trKahP(b)) ? '6 6' : null,
       }).addTo(layerTitik);
-    }
+    });
   });
 
   // marker aset bawaan: di layer terpisah, dibangun sekali, disembunyikan saat
