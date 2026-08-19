@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=60">
+  <link rel="stylesheet" href="css/style.css?v=61">
 </head>
 <body>
 
@@ -304,8 +304,10 @@
         <div class="judul-seksi">Dasbor Manajemen</div>
         <a class="tombol utama" href="dasbor.html" style="display:block;text-align:center;text-decoration:none;margin-bottom:4px">📊 Buka Dasbor (peta kondisi + status usulan)</a>
         <p class="catatan-kecil" style="margin-bottom:10px">Untuk perencana/manajer: gabungan data semua surveyor, pantau status tindak lanjut usulan.</p>
-        <div class="judul-seksi">Ekspor Hasil Survey</div>
-        <p class="catatan-kecil" style="margin-bottom:10px">RAB lengkap ke Excel, titik &amp; rute ke Google Earth.</p>
+        <div class="judul-seksi">Ekspor Hasil Survey — per Pekerjaan</div>
+        <select id="e-pekerjaan" style="width:100%;margin-bottom:6px;border:1px solid #c6d0da;border-radius:8px;padding:9px 8px;font-size:13px"></select>
+        <p class="catatan-kecil" style="margin-bottom:10px">Pekerjaan dipisah per <b>jenis pekerjaan, lokasi, dan petugas</b> —
+          semua tombol ekspor di bawah (CSV, KML, Gambar, RAB Resmi) mengikuti pekerjaan yang dipilih di atas.</p>
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="tombol utama" id="e-csv">📊 Ekspor RAB ke CSV / Excel</button>
           <button class="tombol utama" id="e-kml">🌍 Ekspor Titik ke KML (Google Earth)</button>
@@ -318,7 +320,8 @@
         <div class="judul-seksi">Proyek di Perangkat (per penyulang / pekerjaan)</div>
         <div id="daftar-proyek"></div>
         <button class="tombol utama" id="p-baru" style="width:100%;margin-bottom:4px">➕ Proyek Baru</button>
-        <p class="catatan-kecil" style="margin-bottom:10px">Tiap proyek punya titik, koreksi, &amp; pengaturan sendiri. Taging, RAB, dan sinkronisasi selalu bekerja pada proyek yang AKTIF.</p>
+        <p class="catatan-kecil" style="margin-bottom:10px">Tiap proyek punya titik, koreksi, &amp; pengaturan sendiri. Taging, RAB, dan sinkronisasi selalu bekerja pada proyek yang AKTIF.
+          Pekerjaan <b>tidak perlu</b> dipisah per proyek — pilih pekerjaannya di <b>Ekspor Hasil Survey</b> di atas (atau menu ⚡) untuk melihat RAB &amp; gambarnya masing-masing.</p>
         <div class="judul-seksi">Impor Titik Aset (KML / CSV)</div>
         <div class="form-baris">
           <div class="form-grup"><label>Impor sebagai</label>
@@ -418,9 +421,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=60"></script>
-  <script src="js/app.js?v=60"></script>
-  <script src="js/masuk.js?v=60"></script>
+  <script src="js/data.js?v=61"></script>
+  <script src="js/app.js?v=61"></script>
+  <script src="js/masuk.js?v=61"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

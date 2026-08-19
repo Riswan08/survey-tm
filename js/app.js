@@ -127,6 +127,37 @@ function renderDaftarProyek() {
   });
 }
 
+// ---------------- PILIHAN PEKERJAAN DI MENU EKSPOR ----------------
+// Semua pekerjaan di proyek dipisah per JENIS + LOKASI + PETUGAS — tombol
+// ekspor (CSV/KML/Gambar/RAB Resmi) bekerja pada pekerjaan yang dipilih.
+let grupEkspor = [];
+
+function isiPilihanEksporPekerjaan() {
+  const sel = $('#e-pekerjaan');
+  if (!sel) return;
+  grupEkspor = [...grupRencanaPerPekerjaan().values()];
+  const saya = (state.settings.petugas || '').trim().toLowerCase();
+  sel.innerHTML = '<option value="">📌 Pekerjaan saya (identitas di ⚙️ Pengaturan)</option>' +
+    grupEkspor.map((daftar, i) => {
+      const p = daftar[0];
+      const milikku = (p.petugas || '').trim().toLowerCase() === saya;
+      return `<option value="${i}">${p.pekerjaan || '(tanpa nama pekerjaan)'} · 👤 ${p.petugas || '(tanpa petugas)'}${p.ulp ? ' · 🏢 ' + p.ulp : ''} — ${daftar.length} titik${milikku ? ' (saya)' : ''}</option>`;
+    }).join('');
+  sel.value = '';
+}
+
+function grupEksporTerpilih() {
+  const sel = $('#e-pekerjaan');
+  if (!sel || sel.value === '') return null;
+  return grupEkspor[Number(sel.value)] || null;
+}
+
+// jalankan ekspor instan (CSV/KML) pada pekerjaan terpilih lalu pulihkan
+function eksporDenganPilihan(fn) {
+  rencanaTampil = grupEksporTerpilih();
+  try { fn(); } finally { rencanaTampil = null; }
+}
+
 // identitas perangkat — untuk uid titik yang unik lintas surveyor (sinkronisasi M4)
 const DEVICE_ID = (() => {
   let d = localStorage.getItem('cakra_device_id');
@@ -2287,8 +2318,10 @@ function renderPerluasan() {
     }
     let biaya = 0;
     daftar.forEach(p => { biaya += biayaPerTiang(p).total; });
-    // tahap tersimpan per NAMA PEKERJAAN (tanpa embel-embel petugas)
-    const stKey = (statusPekerjaanUnit[daftar[0].pekerjaan || '(tanpa nama pekerjaan)'] || {}).status;
+    // tahap tersimpan per PEKERJAAN+PETUGAS (kunci lama per nama saja = cadangan)
+    const labelSt = daftar[0].pekerjaan || '(tanpa nama pekerjaan)';
+    const stKey = ((statusPekerjaanUnit[`${labelSt}@@${daftar[0].petugas || ''}`] ||
+                    statusPekerjaanUnit[labelSt]) || {}).status;
     const st = STATUS_PEKERJAAN[stKey] || STATUS_PEKERJAAN.survey;
     // titik sambung ke jaringan eksisting (manual via mode Koreksi menang; else otomatis)
     const suplai = suplaiUntuk(daftar);
@@ -2319,24 +2352,14 @@ function renderPerluasan() {
       map.fitBounds(daftar.map(p => [p.lat, p.lng]), { padding: [60, 60] });
       toast(`📍 Lokasi pekerjaan: ${nama}`);
     };
-    // RAB & Gambar sesuai peruntukan masing-masing pekerjaan (per petugas & lokasi)
+    // RAB Resmi & Gambar sesuai peruntukan masing-masing pekerjaan (per petugas & lokasi)
     div.querySelector('[data-a=rab]').onclick = () => {
       tutupModal('modal-perluasan');
-      rencanaTampil = daftar;
-      renderRAB();
+      bukaRABResmiUntuk(daftar);
     };
     div.querySelector('[data-a=gambar]').onclick = () => {
       tutupModal('modal-perluasan');
-      rencanaTampil = daftar;
-      // kop lembar diisi identitas pekerjaan terpilih
-      const label = daftar[0].pekerjaan || '';
-      let judulG = label, lokasiG = '';
-      const posisiPisah = label.indexOf(' — ');
-      if (posisiPisah > 0) { judulG = label.slice(0, posisiPisah); lokasiG = label.slice(posisiPisah + 3); }
-      $('#lg-judul').value = (judulG || 'Gambar Rencana').toUpperCase();
-      $('#lg-lokasi').value = lokasiG;
-      $('#lg-digambar').value = daftar[0].petugas || '';
-      bukaLembarGambar();
+      bukaLembarGambarUntuk(daftar);
     };
     const btnEdit = div.querySelector('[data-a=edit]');
     if (btnEdit) btnEdit.onclick = () => bukaEditPekerjaan(daftar);
@@ -2348,6 +2371,32 @@ function renderPerluasan() {
     };
     wadah.appendChild(div);
   });
+}
+
+// buka LEMBAR GAMBAR untuk PEKERJAAN TERPILIH — kop diisi identitas pekerjaan itu
+function bukaLembarGambarUntuk(daftar) {
+  rencanaTampil = daftar;
+  const label = daftar[0].pekerjaan || '';
+  let judulG = label, lokasiG = '';
+  const posisiPisah = label.indexOf(' — ');
+  if (posisiPisah > 0) { judulG = label.slice(0, posisiPisah); lokasiG = label.slice(posisiPisah + 3); }
+  $('#lg-judul').value = (judulG || 'Gambar Rencana').toUpperCase();
+  $('#lg-lokasi').value = lokasiG;
+  $('#lg-digambar').value = daftar[0].petugas || '';
+  bukaLembarGambar();
+}
+
+// buka RAB RESMI (format UP3) untuk PEKERJAAN TERPILIH — uraian pekerjaan,
+// lokasi, dan nama pembuat diisi dari identitas pekerjaan itu
+function bukaRABResmiUntuk(daftar) {
+  rencanaTampil = daftar;
+  const label = daftar[0].pekerjaan || '';
+  const posisiPisah = label.indexOf(' — ');
+  const lokasiP = posisiPisah > 0 ? label.slice(posisiPisah + 3) : '';
+  $('#rb-pekerjaan').value = label.replace(' — ', ' ');
+  $('#rb-lokasi').value = [lokasiP, daftar[0].ulp].filter(Boolean).join(' — ') || 'PT PLN (Persero) UP3 Masohi';
+  $('#rb-nama2').value = daftar[0].petugas || '';
+  bukaRABResmi();
 }
 
 // ---------------- EDIT IDENTITAS PEKERJAAN (admin & manajemen) ----------------
@@ -2387,11 +2436,16 @@ function simpanEditPekerjaan() {
     p.diubah = Date.now();
     n++;
   });
-  // tahap yang sudah berjalan ikut ke nama baru (tampilan lokal)
-  if (labelLama && statusPekerjaanUnit[labelLama] && !statusPekerjaanUnit[labelBaru]) {
-    statusPekerjaanUnit[labelBaru] = { ...statusPekerjaanUnit[labelLama] };
-    localStorage.setItem(KUNCI_STATUS_PEKERJAAN, JSON.stringify(statusPekerjaanUnit));
-  }
+  // tahap yang sudah berjalan ikut ke nama baru (kunci pekerjaan+petugas & kunci lama)
+  const ptgSt = (state.poles.find(p => set.has(p.uid)) || {}).petugas || '';
+  let adaPindah = false;
+  [[labelLama, labelBaru], [`${labelLama}@@${ptgSt}`, `${labelBaru}@@${ptgSt}`]].forEach(([lama, baru]) => {
+    if (lama !== baru && statusPekerjaanUnit[lama] && !statusPekerjaanUnit[baru]) {
+      statusPekerjaanUnit[baru] = { ...statusPekerjaanUnit[lama] };
+      adaPindah = true;
+    }
+  });
+  if (adaPindah) localStorage.setItem(KUNCI_STATUS_PEKERJAAN, JSON.stringify(statusPekerjaanUnit));
   simpan(); render(); renderPerluasan();
   tutupModal('modal-edit-pekerjaan');
   toast(n ? `✏️ ${n} titik diperbarui menjadi "${labelBaru}"${ulp ? ' (' + ulp + ')' : ''} — tersinkron otomatis`
@@ -2510,9 +2564,17 @@ function eksporCSV() {
 
   baris('Si CAKRA - RAB SURVEY JARINGAN TM');
   baris('Cepat - Tepat - Akurat');
-  baris('Jenis Pekerjaan', JENIS_PEKERJAAN[s.jenisPekerjaan] || '');
-  baris('Nama Pekerjaan', (s.namaPekerjaan || '-').replace(/;/g, ','));
-  baris('Surveyor', (s.petugas || '-').replace(/;/g, ','));
+  if (rencanaTampil) {
+    // identitas dari PEKERJAAN TERPILIH di pemilih menu Ekspor
+    const p0 = rencanaTampil[0];
+    baris('Pekerjaan', (p0.pekerjaan || '-').replace(/;/g, ','));
+    baris('Lokasi (ULP)', (p0.ulp || '-').replace(/;/g, ','));
+    baris('Surveyor', (p0.petugas || '-').replace(/;/g, ','));
+  } else {
+    baris('Jenis Pekerjaan', JENIS_PEKERJAAN[s.jenisPekerjaan] || '');
+    baris('Nama Pekerjaan', (s.namaPekerjaan || '-').replace(/;/g, ','));
+    baris('Surveyor', (s.petugas || '-').replace(/;/g, ','));
+  }
   baris('Tanggal ekspor', new Date().toLocaleString('id-ID'));
   baris('');
   baris('A. REKAP MATERIAL & JASA KONSTRUKSI (Lampiran UIW Maluku & Maluku Utara - Tiang Besi)');
@@ -2595,13 +2657,18 @@ function eksporCSV() {
     baris('TOTAL USULAN PERBAIKAN', '', '', '', '', '', '', '', '', Math.round(rab.totalUsulan));
   }
 
-  unduh('CAKRA-RAB-Survey.csv', '﻿' + B.join('\n'), 'text/csv;charset=utf-8');
+  const namaFileCSV = rencanaTampil
+    ? `SiCAKRA-RAB-${(rencanaTampil[0].pekerjaan || 'Pekerjaan').replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '-')}-${(rencanaTampil[0].petugas || '').replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '-')}.csv`
+    : 'CAKRA-RAB-Survey.csv';
+  unduh(namaFileCSV, '﻿' + B.join('\n'), 'text/csv;charset=utf-8');
   toast('RAB diekspor ke CSV (buka di Excel)');
 }
 
 function eksporKML() {
   const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  let plek = state.poles.map(p => {
+  // pekerjaan terpilih (dari pemilih di menu Ekspor) → hanya titik & rute pekerjaan itu
+  const titikKML = rencanaTampil || state.poles;
+  let plek = titikKML.map(p => {
     const eksisting = p.mode === 'eksisting';
     const pelangganKah = p.mode === 'pelanggan';
     const label = pelangganKah ? 'Calon Pelanggan' : (eksisting ? (JENIS_ASET[p.jenisAset] || {}).nama || 'Aset' : p.konstruksi);
@@ -2618,7 +2685,8 @@ function eksporKML() {
   }).join('');
   // rute per PEKERJAAN+PETUGAS berbentuk pohon (mendukung percabangan) —
   // tiap sisi jadi garis sendiri dalam satu MultiGeometry
-  grupRencanaPerPekerjaan().forEach((daftar) => {
+  const grupKML = rencanaTampil ? [rencanaTampil] : [...grupRencanaPerPekerjaan().values()];
+  grupKML.forEach((daftar) => {
     const sisi = sisiRantai(daftar);
     if (!sisi.length) return;
     const namaRute = `${daftar[0].pekerjaan || 'Rencana Jaringan'}${daftar[0].petugas ? ' — ' + daftar[0].petugas : ''}`;
@@ -2629,7 +2697,10 @@ function eksporKML() {
   const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Si CAKRA — Survey Aset Distribusi</name>${plek}
 </Document></kml>`;
-  unduh('CAKRA-Survey.kml', kml, 'application/vnd.google-earth.kml+xml');
+  const namaFileKML = rencanaTampil
+    ? `SiCAKRA-${(rencanaTampil[0].pekerjaan || 'Pekerjaan').replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '-')}-${(rencanaTampil[0].petugas || '').replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '-')}.kml`
+    : 'CAKRA-Survey.kml';
+  unduh(namaFileKML, kml, 'application/vnd.google-earth.kml+xml');
   toast('Diekspor ke KML (buka di Google Earth)');
 }
 
@@ -2910,12 +2981,14 @@ async function unduhSemuaPekerjaan() {
   baris('Nama Pekerjaan', 'ULP', 'Petugas', 'Tahap', 'Tiang Rencana', 'JTM', 'JTR', 'Rute (m)',
     'Biaya Konstruksi (Rp)', 'Usulan Perbaikan', 'Usulan Selesai', 'Nilai Usulan (Rp)',
     'Calon Pelanggan', 'Terakhir Disimpan');
+  // dipisah per PEKERJAAN + PETUGAS — sejalan dengan dasbor monitoring
   const grup = {};
   semuaPoles.forEach(p => {
-    const k = p.pekerjaan || '(tanpa nama pekerjaan)';
+    const k = `${p.pekerjaan || '(tanpa nama pekerjaan)'}@@${p.petugas || ''}`;
     (grup[k] = grup[k] || []).push(p);
   });
-  Object.entries(grup).forEach(([nama, daftar]) => {
+  Object.entries(grup).forEach(([kunciG, daftar]) => {
+    const nama = kunciG.split('@@')[0];
     const rencana = daftar.filter(p => !p.mode || p.mode === 'rencana');
     // rute dihitung per petugas — dua petugas tidak pernah dianggap satu rantai
     let rute = 0;
@@ -2933,7 +3006,7 @@ async function unduhSemuaPekerjaan() {
     daftar.forEach(p => (p.usulan || []).forEach(u => {
       usulan++; if (u.status === 'selesai') selesai++; nilai += biayaPaket(u.paket).total;
     }));
-    const st = STATUS_PEKERJAAN[(statusPkj[nama] || {}).status] || STATUS_PEKERJAAN.survey;
+    const st = STATUS_PEKERJAAN[((statusPkj[kunciG] || statusPkj[nama]) || {}).status] || STATUS_PEKERJAAN.survey;
     baris(nama,
       [...new Set(daftar.map(p => p.ulp).filter(Boolean))].join(', '),
       [...new Set(daftar.map(p => p.petugas).filter(Boolean))].join(', '),
@@ -3320,12 +3393,16 @@ function renderRABResmi() {
 function bukaRABResmi() {
   const s = state.settings;
   const isi = (sel2, v) => { const el = $(sel2); if (!el.value) el.value = v || ''; };
-  isi('#rb-pekerjaan', (s.namaPekerjaan ? `${JENIS_PEKERJAAN[s.jenisPekerjaan] || ''} ${s.namaPekerjaan}` : JENIS_PEKERJAAN[s.jenisPekerjaan] || '').trim());
-  isi('#rb-lokasi', 'PT PLN (Persero) UP3 Masohi');
+  // saat pekerjaan terpilih (menu ⚡ / pilihan ekspor): identitas sudah diisi
+  // pemanggil — jangan ditimpa identitas pekerjaan sendiri
+  if (!rencanaTampil) {
+    isi('#rb-pekerjaan', (s.namaPekerjaan ? `${JENIS_PEKERJAAN[s.jenisPekerjaan] || ''} ${s.namaPekerjaan}` : JENIS_PEKERJAAN[s.jenisPekerjaan] || '').trim());
+    isi('#rb-lokasi', 'PT PLN (Persero) UP3 Masohi');
+    isi('#rb-nama2', s.petugas || '');
+  }
   isi('#rb-kota', 'Masohi');
   isi('#rb-jab1', 'Assistant Manager Perencanaan');
   isi('#rb-jab2', 'Team Leader Perencanaan Sistem');
-  isi('#rb-nama2', s.petugas || '');
   isi('#rb-jab3', 'Manager UP3 Masohi');
   renderRABResmi();
   pasSkalaLembar();
@@ -3410,7 +3487,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#ringkas').onclick = () => { rencanaTampil = null; renderRAB(); };
   $('#btn-daftar').onclick = () => { renderDaftarTiang(); bukaModal('modal-daftar'); };
   $('#btn-pengaturan').onclick = renderPengaturan;
-  $('#btn-ekspor').onclick = () => { renderDaftarProyek(); bukaModal('modal-ekspor'); };
+  $('#btn-ekspor').onclick = () => { renderDaftarProyek(); isiPilihanEksporPekerjaan(); bukaModal('modal-ekspor'); };
   $('#p-baru').onclick = buatProyek;
   $('#e-impor-kml').onchange = (e) => { if (e.target.files[0]) imporTitikAset(e.target.files[0]); e.target.value = ''; };
 
@@ -3452,9 +3529,13 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('offline', perbaruiStatusSinkron);
 
   // ekspor (simpan/buka file JSON dihapus — data real-time di database unit)
-  $('#e-csv').onclick = eksporCSV;
-  $('#e-kml').onclick = eksporKML;
-  $('#e-pdf').onclick = () => { tutupModal('modal-ekspor'); rencanaTampil = null; bukaLembarGambar(); };
+  $('#e-csv').onclick = () => eksporDenganPilihan(eksporCSV);
+  $('#e-kml').onclick = () => eksporDenganPilihan(eksporKML);
+  $('#e-pdf').onclick = () => {
+    const g = grupEksporTerpilih();
+    tutupModal('modal-ekspor');
+    if (g) { bukaLembarGambarUntuk(g); } else { rencanaTampil = null; bukaLembarGambar(); }
+  };
   $('#lg-cetak').onclick = () => { siapkanCetak(); window.print(); };
   $('#lg-tutup').onclick = () => {
     $('#lembar-wrap').classList.add('sembunyi');
@@ -3467,9 +3548,22 @@ document.addEventListener('DOMContentLoaded', () => {
       render();
     }
   };
-  $('#e-rabresmi').onclick = () => { tutupModal('modal-ekspor'); bukaRABResmi(); };
+  $('#e-rabresmi').onclick = () => {
+    const g = grupEksporTerpilih();
+    tutupModal('modal-ekspor');
+    if (g) { bukaRABResmiUntuk(g); } else { rencanaTampil = null; bukaRABResmi(); }
+  };
   $('#rb-cetak').onclick = () => { siapkanCetak(); window.print(); };
-  $('#rb-tutup').onclick = () => { $('#rab-wrap').classList.add('sembunyi'); pulihkanCetak(); };
+  $('#rb-tutup').onclick = () => {
+    $('#rab-wrap').classList.add('sembunyi');
+    pulihkanCetak();
+    if (rencanaTampil) {
+      // kembali ke pekerjaan sendiri: kosongkan identitas pekerjaan terpilih
+      rencanaTampil = null;
+      ['#rb-pekerjaan', '#rb-lokasi', '#rb-nama2'].forEach(s => { $(s).value = ''; });
+      render();
+    }
+  };
   // skala pas satu halaman juga saat cetak dari menu browser (Ctrl+P / Bagikan → Cetak)
   window.addEventListener('beforeprint', siapkanCetak);
   window.addEventListener('afterprint', pulihkanCetak);

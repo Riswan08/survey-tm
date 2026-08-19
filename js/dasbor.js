@@ -86,9 +86,11 @@ function biayaTitikRencana(p) {
 // rekap perluasan per pekerjaan: jumlah tiang rencana, panjang rute, ± nilai RAB
 // (penghantar diperkirakan AAAC 70 · 3 fasa · andongan 3% + jasa tarik)
 function perluasanPerPekerjaan() {
+  // DIPISAH per PEKERJAAN + PETUGAS — tiap pekerjaan/lokasi/petugas punya
+  // tahapan & progres sendiri, tidak digabung walau namanya sama
   const grup = {};
   poles.filter(p => p.mode === 'rencana').forEach(p => {
-    const kunci = p.pekerjaan || '(tanpa nama pekerjaan)';
+    const kunci = `${p.pekerjaan || '(tanpa nama pekerjaan)'}@@${p.petugas || ''}`;
     (grup[kunci] = grup[kunci] || []).push(p);
   });
   const hasil = {};
@@ -120,6 +122,9 @@ function perluasanPerPekerjaan() {
       tiangJTM: daftar.filter(p => !trKah(p)).length,
       tiangJTR: daftar.filter(trKah).length,
       rute, ruteJTM, ruteJTR, biaya, mulai, akhir,
+      pekerjaan: daftar[0].pekerjaan || '(tanpa nama pekerjaan)',
+      petugas: daftar[0].petugas || '',
+      ulp: [...new Set(daftar.map(p => p.ulp).filter(Boolean))].join(', '),
     };
   });
   return hasil;
@@ -133,8 +138,9 @@ function fmtRute(m) {
 }
 
 // tahap pekerjaan (survey→diusulkan→disetujui→konstruksi→selesai)
-function tahapPekerjaan(nama) {
-  const s = (pekerjaanStatus[nama] || {}).status;
+// kunci baru = "pekerjaan@@petugas"; kunci lama (nama saja) tetap dibaca sebagai cadangan
+function tahapPekerjaan(kunci) {
+  const s = ((pekerjaanStatus[kunci] || pekerjaanStatus[String(kunci).split('@@')[0]]) || {}).status;
   return STATUS_PEKERJAAN[s] ? s : 'survey';
 }
 
@@ -561,9 +567,11 @@ function renderDaftarPekerjaan() {
     wadah.innerHTML = '<p class="catatan-kecil">Belum ada pekerjaan yang masuk.</p>';
     return;
   }
+  // DIPISAH per PEKERJAAN + PETUGAS — tiap baris satu pekerjaan milik satu
+  // petugas dengan lokasi, tahapan & progres masing-masing
   const grup = {};
   poles.forEach(p => {
-    const kunci = p.pekerjaan || '(tanpa nama pekerjaan)';
+    const kunci = `${p.pekerjaan || '(tanpa nama pekerjaan)'}@@${p.petugas || ''}`;
     const g = grup[kunci] = grup[kunci] ||
       { titik: 0, usulan: 0, selesai: 0, nilai: 0, pelanggan: 0, evidenLengkap: 0,
         petugas: new Set(), ulp: new Set(), terakhir: 0 };
@@ -586,7 +594,7 @@ function renderDaftarPekerjaan() {
   const perluasan = perluasanPerPekerjaan();
   const bolehUbah = typeof bolehKelolaUsulan === 'function' && bolehKelolaUsulan();
   let html = `<table class="rab"><tr>
-    <th>Nama Pekerjaan</th><th>Unit</th><th>Petugas</th>
+    <th>Nama Pekerjaan</th><th>Lokasi Pekerjaan</th><th>Unit</th><th>Petugas</th>
     <th class="angka">Tiang Rencana</th><th class="angka">Rute</th><th class="angka">± RAB Perluasan (Rp)</th>
     <th style="min-width:150px">Tahap &amp; Progres</th>
     <th class="angka">Calon Pelanggan</th>
@@ -597,22 +605,28 @@ function renderDaftarPekerjaan() {
       const pa = perluasan[a[0]] ? 1 : 0, pb = perluasan[b[0]] ? 1 : 0;
       return (pb - pa) || (b[1].terakhir - a[1].terakhir);
     })
-    .forEach(([nama, g]) => {
-      const pl = perluasan[nama];
+    .forEach(([kunci, g]) => {
+      const pl = perluasan[kunci];
+      const label = kunci.split('@@')[0];
+      // "Jenis — Lokasi/Nama" dipisah menjadi dua kolom
+      const posP = label.indexOf(' — ');
+      const namaPkj = posP > 0 ? label.slice(0, posP) : label;
+      const lokasiPkj = posP > 0 ? label.slice(posP + 3) : '';
       // tahap & progres hanya untuk pekerjaan perluasan (punya tiang rencana)
       let selTahap = '—';
       if (pl) {
-        const kunciTahap = tahapPekerjaan(nama);
+        const kunciTahap = tahapPekerjaan(kunci);
         const st = STATUS_PEKERJAAN[kunciTahap];
         const kontrol = bolehUbah
-          ? `<select data-pkj="${encodeURIComponent(nama)}" style="border-left:4px solid ${st.warna}">${
+          ? `<select data-pkj="${encodeURIComponent(kunci)}" style="border-left:4px solid ${st.warna}">${
               Object.entries(STATUS_PEKERJAAN).map(([k, s]) =>
                 `<option value="${k}" ${k === kunciTahap ? 'selected' : ''}>${s.nama} (${s.persen}%)</option>`).join('')}</select>`
           : `<span class="badge-skor" style="background:${st.warna}">${st.nama} ${st.persen}%</span>`;
         selTahap = `${kontrol}<div class="batang-progres" style="margin-top:4px"><div style="width:${st.persen}%;background:${st.warna}"></div></div>`;
       }
       html += `<tr>
-        <td><b>${nama}</b>${pl ? ` <button class="tombol polos kecil" data-lokasi="${encodeURIComponent(nama)}" title="Lihat lokasi pekerjaan di peta">📍</button>` : ''}</td>
+        <td><b>${namaPkj}</b>${pl ? ` <button class="tombol polos kecil" data-lokasi="${encodeURIComponent(kunci)}" title="Lihat lokasi pekerjaan di peta">📍</button>` : ''}</td>
+        <td>${lokasiPkj || '—'}</td>
         <td>${[...g.ulp].join(', ') || '—'}</td>
         <td>${[...g.petugas].join(', ') || '—'}</td>
         <td class="angka">${pl
@@ -633,26 +647,29 @@ function renderDaftarPekerjaan() {
     <p class="catatan-kecil">± RAB Perluasan = tiang + konstruksi + aksesoris + jasa tanam + perkiraan penghantar
     (AAAC 70 · 3 fasa · andongan 3%) + jasa tarik — RAB rinci resmi tetap dari aplikasi surveyor (🧾 RAB Resmi).</p>`;
 
-  // 📍 menuju lokasi pekerjaan di peta
+  // 📍 menuju lokasi pekerjaan di peta (per pekerjaan + petugas)
   wadah.querySelectorAll('[data-lokasi]').forEach(b => {
     b.onclick = () => {
-      const nama = decodeURIComponent(b.dataset.lokasi);
-      const titik = poles.filter(p => p.mode === 'rencana' && (p.pekerjaan || '(tanpa nama pekerjaan)') === nama);
+      const kunci = decodeURIComponent(b.dataset.lokasi);
+      const [nama, ptg] = kunci.split('@@');
+      const titik = poles.filter(p => p.mode === 'rencana' &&
+        (p.pekerjaan || '(tanpa nama pekerjaan)') === nama && (p.petugas || '') === (ptg || ''));
       if (!titik.length) return;
       peta.fitBounds(titik.map(p => [p.lat, p.lng]), { padding: [60, 60] });
       document.querySelector('#peta-dasbor').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      toast(`📍 Lokasi "${nama}" — garis biru di peta (putus-putus = JTR)`);
+      toast(`📍 Lokasi "${nama}"${ptg ? ' (' + ptg + ')' : ''} — garis biru di peta (putus-putus = JTR)`);
     };
   });
 
-  // ubah tahap → tersimpan & tersinkron otomatis, timeline ikut segar
+  // ubah tahap → tersimpan per pekerjaan+petugas & tersinkron otomatis, timeline ikut segar
   wadah.querySelectorAll('select[data-pkj]').forEach(sel => {
     sel.onchange = () => {
-      const nama = decodeURIComponent(sel.dataset.pkj);
+      const kunci = decodeURIComponent(sel.dataset.pkj);
       const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
-      pekerjaanStatus[nama] = { status: sel.value, diubah: Date.now(), oleh: sesi.petugas || '' };
+      pekerjaanStatus[kunci] = { status: sel.value, diubah: Date.now(), oleh: sesi.petugas || '' };
       renderDaftarPekerjaan(); renderTimeline();
-      toast(`⚡ "${nama}" → ${STATUS_PEKERJAAN[sel.value].nama}`);
+      const [nama, ptg] = kunci.split('@@');
+      toast(`⚡ "${nama}"${ptg ? ' (' + ptg + ')' : ''} → ${STATUS_PEKERJAAN[sel.value].nama}`);
       kirimServer(true);
     };
   });
@@ -680,12 +697,14 @@ function renderTimeline() {
 
   let html = `<div class="tl-sumbu"><span>${tglPendek(min)}</span>
     <span style="color:#e53935">▼ hari ini</span><span>${tglPendek(maks)}</span></div>`;
-  entri.sort((a, b) => a[1].mulai - b[1].mulai).forEach(([nama, g]) => {
-    const st = STATUS_PEKERJAAN[tahapPekerjaan(nama)];
+  entri.sort((a, b) => a[1].mulai - b[1].mulai).forEach(([kunci, g]) => {
+    const st = STATUS_PEKERJAAN[tahapPekerjaan(kunci)];
     const kiri = ((g.mulai - min) / bentang) * 100;
     const lebar = Math.max(((g.akhir - g.mulai) / bentang) * 100, 3);
+    // satu batang per pekerjaan+petugas — nama, lokasi, dan petugasnya tampil
+    const namaTL = g.pekerjaan + (g.petugas ? ` · 👤 ${g.petugas}` : '');
     html += `<div class="tl-baris">
-      <div class="tl-nama" title="${nama}">${nama}</div>
+      <div class="tl-nama" title="${namaTL}">${namaTL}</div>
       <div class="tl-rel">
         <div class="tl-kini" style="left:${posKini}%"></div>
         <div class="tl-bar" style="left:${Math.min(kiri, 97)}%;width:${lebar}%;background:${st.warna}"
