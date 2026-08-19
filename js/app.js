@@ -395,7 +395,12 @@ function tiangTerdekatDari(pos, kecualiId) {
   return terdekat ? { pole: terdekat, jarak: jarakMin } : null;
 }
 
+// bila diisi (dari menu ⚡): RAB & Gambar Rencana menampilkan PEKERJAAN TERPILIH
+// (milik petugas mana pun) — dikosongkan lagi saat lembarnya ditutup
+let rencanaTampil = null;
+
 const polesRencana = () => {
+  if (rencanaTampil) return rencanaTampil;
   // rantai AKTIF = pekerjaan pada Identitas Pekerjaan saat ini, MILIK SENDIRI;
   // titik tanpa label/petugas ikut serta (akan menerima identitas saat disimpan)
   const label = labelPekerjaan();
@@ -1765,11 +1770,19 @@ function renderRAB() {
   const s = state.settings;
   let html = '';
 
-  // identitas pekerjaan
-  html += `<p style="margin-bottom:10px;font-size:13px">
-    <b>Jenis Pekerjaan:</b> ${JENIS_PEKERJAAN[s.jenisPekerjaan] || '—'}
-    ${s.namaPekerjaan ? `<br><b>Nama Pekerjaan:</b> ${s.namaPekerjaan}` : ''}
-    ${s.petugas ? `<br><b>Surveyor:</b> ${s.petugas}` : ''}</p>`;
+  // identitas pekerjaan — bila membuka RAB pekerjaan terpilih dari menu ⚡,
+  // tampilkan identitas pekerjaan itu (bukan identitas proyek sendiri)
+  if (rencanaTampil && rencanaTampil.length) {
+    const g = rencanaTampil[0];
+    html += `<p style="margin-bottom:10px;font-size:13px;background:#e8f2fb;border-radius:8px;padding:8px 10px">
+      ⚡ <b>RAB pekerjaan terpilih:</b> ${g.pekerjaan || '(tanpa nama pekerjaan)'}
+      <br><b>Surveyor:</b> ${g.petugas || '—'}${g.ulp ? ` · <b>Unit:</b> ${g.ulp}` : ''}</p>`;
+  } else {
+    html += `<p style="margin-bottom:10px;font-size:13px">
+      <b>Jenis Pekerjaan:</b> ${JENIS_PEKERJAAN[s.jenisPekerjaan] || '—'}
+      ${s.namaPekerjaan ? `<br><b>Nama Pekerjaan:</b> ${s.namaPekerjaan}` : ''}
+      ${s.petugas ? `<br><b>Surveyor:</b> ${s.petugas}` : ''}</p>`;
+  }
 
   html += `<div class="judul-seksi">A. Rekap Material & Jasa Konstruksi (format lampiran UIW MMU)</div>`;
   if (rab.barisRekap.length === 0) {
@@ -2295,6 +2308,8 @@ function renderPerluasan() {
           👤 ${petugasG} · 🏢 ${ulpG}<br>${infoSambung}</div>
       </div>
       <div class="aksi">
+        <button class="tombol polos kecil" data-a="rab" title="Lihat RAB pekerjaan ini">💰</button>
+        <button class="tombol polos kecil" data-a="gambar" title="Gambar rencana pekerjaan ini (cetak/PDF)">📄</button>
         ${bolehEdit ? '<button class="tombol polos kecil" data-a="edit" title="Edit jenis/nama/ULP pekerjaan">✏️</button>' : ''}
         <button class="tombol polos kecil" data-a="sambung" title="Tentukan titik sambung ke jaringan eksisting">🔌</button>
         <button class="tombol utama kecil" data-a="peta">📍</button>
@@ -2303,6 +2318,25 @@ function renderPerluasan() {
       tutupModal('modal-perluasan');
       map.fitBounds(daftar.map(p => [p.lat, p.lng]), { padding: [60, 60] });
       toast(`📍 Lokasi pekerjaan: ${nama}`);
+    };
+    // RAB & Gambar sesuai peruntukan masing-masing pekerjaan (per petugas & lokasi)
+    div.querySelector('[data-a=rab]').onclick = () => {
+      tutupModal('modal-perluasan');
+      rencanaTampil = daftar;
+      renderRAB();
+    };
+    div.querySelector('[data-a=gambar]').onclick = () => {
+      tutupModal('modal-perluasan');
+      rencanaTampil = daftar;
+      // kop lembar diisi identitas pekerjaan terpilih
+      const label = daftar[0].pekerjaan || '';
+      let judulG = label, lokasiG = '';
+      const posisiPisah = label.indexOf(' — ');
+      if (posisiPisah > 0) { judulG = label.slice(0, posisiPisah); lokasiG = label.slice(posisiPisah + 3); }
+      $('#lg-judul').value = (judulG || 'Gambar Rencana').toUpperCase();
+      $('#lg-lokasi').value = lokasiG;
+      $('#lg-digambar').value = daftar[0].petugas || '';
+      bukaLembarGambar();
     };
     const btnEdit = div.querySelector('[data-a=edit]');
     if (btnEdit) btnEdit.onclick = () => bukaEditPekerjaan(daftar);
@@ -3126,16 +3160,21 @@ function gambarLembar() {
 }
 
 function bukaLembarGambar() {
-  const titikGambar = state.poles.filter(p => p.mode !== 'pelanggan');
+  // saat pekerjaan terpilih (menu ⚡): pusatkan peta hanya ke titik pekerjaan itu
+  const titikGambar = rencanaTampil || state.poles.filter(p => p.mode !== 'pelanggan');
   if (!titikGambar.length) { toast('Belum ada titik survey untuk digambar'); return; }
   const s = state.settings;
   const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
 
-  // pra-isi hanya bila kosong — isian pengguna dipertahankan selama halaman terbuka
+  // pra-isi hanya bila kosong — isian pengguna dipertahankan selama halaman terbuka.
+  // Saat menampilkan PEKERJAAN TERPILIH (dari menu ⚡), kop sudah diisi pemanggil —
+  // jangan ditimpa identitas pekerjaan sendiri.
   const isi = (sel, nilai) => { const el = $(sel); if (!el.value) el.value = nilai || ''; };
-  isi('#lg-judul', (JENIS_PEKERJAAN[s.jenisPekerjaan] || 'Gambar Rencana').toUpperCase());
-  isi('#lg-lokasi', s.namaPekerjaan);
-  isi('#lg-digambar', s.petugas || sesi.petugas);
+  if (!rencanaTampil) {
+    isi('#lg-judul', (JENIS_PEKERJAAN[s.jenisPekerjaan] || 'Gambar Rencana').toUpperCase());
+    isi('#lg-lokasi', s.namaPekerjaan);
+    isi('#lg-digambar', s.petugas || sesi.petugas);
+  }
   isi('#lg-nomor', '1');
   // baris ULP dari sesi — disembunyikan bila sama dengan baris UP3 di atasnya (hindari dobel)
   const ulpSesi = (sesi.ulp || '').toUpperCase();
@@ -3295,7 +3334,10 @@ function bukaRABResmi() {
 
 // ---------------- MODAL ----------------
 function bukaModal(id) { $('#' + id).classList.add('tampil'); }
-function tutupModal(id) { $('#' + id).classList.remove('tampil'); }
+function tutupModal(id) {
+  $('#' + id).classList.remove('tampil');
+  if (id === 'modal-rab' && rencanaTampil) { rencanaTampil = null; render(); } // kembali ke pekerjaan sendiri
+}
 
 // ---------------- INIT ----------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -3342,7 +3384,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#btn-tag').innerHTML = modeTaging ? '🎯 Mode Taging: AKTIF' : '🎯 Mode Taging';
     toast(modeTaging ? 'Ketuk peta untuk menaruh tiang' : 'Mode taging dimatikan');
   };
-  $('#btn-rab').onclick = renderRAB;
+  $('#btn-rab').onclick = () => { rencanaTampil = null; renderRAB(); };
   $('#btn-tugas').onclick = () => { renderTugas(); bukaModal('modal-tugas'); };
   $('#btn-perluasan').onclick = () => { renderPerluasan(); bukaModal('modal-perluasan'); };
   $('#ep-simpan').onclick = simpanEditPekerjaan;
@@ -3365,7 +3407,7 @@ document.addEventListener('DOMContentLoaded', () => {
   map.on('dragstart', () => {
     if (liveAktif && ikutiPeta) { ikutiPeta = false; $('#lv-ikuti').classList.remove('aktif'); }
   });
-  $('#ringkas').onclick = renderRAB;
+  $('#ringkas').onclick = () => { rencanaTampil = null; renderRAB(); };
   $('#btn-daftar').onclick = () => { renderDaftarTiang(); bukaModal('modal-daftar'); };
   $('#btn-pengaturan').onclick = renderPengaturan;
   $('#btn-ekspor').onclick = () => { renderDaftarProyek(); bukaModal('modal-ekspor'); };
@@ -3412,9 +3454,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // ekspor (simpan/buka file JSON dihapus — data real-time di database unit)
   $('#e-csv').onclick = eksporCSV;
   $('#e-kml').onclick = eksporKML;
-  $('#e-pdf').onclick = () => { tutupModal('modal-ekspor'); bukaLembarGambar(); };
+  $('#e-pdf').onclick = () => { tutupModal('modal-ekspor'); rencanaTampil = null; bukaLembarGambar(); };
   $('#lg-cetak').onclick = () => { siapkanCetak(); window.print(); };
-  $('#lg-tutup').onclick = () => { $('#lembar-wrap').classList.add('sembunyi'); pulihkanCetak(); };
+  $('#lg-tutup').onclick = () => {
+    $('#lembar-wrap').classList.add('sembunyi');
+    pulihkanCetak();
+    if (rencanaTampil) {
+      // kembali ke pekerjaan sendiri: kosongkan kop pekerjaan terpilih agar
+      // pembukaan berikutnya terisi ulang dari identitas sendiri
+      rencanaTampil = null;
+      ['#lg-judul', '#lg-lokasi', '#lg-digambar'].forEach(s => { $(s).value = ''; });
+      render();
+    }
+  };
   $('#e-rabresmi').onclick = () => { tutupModal('modal-ekspor'); bukaRABResmi(); };
   $('#rb-cetak').onclick = () => { siapkanCetak(); window.print(); };
   $('#rb-tutup').onclick = () => { $('#rab-wrap').classList.add('sembunyi'); pulihkanCetak(); };
