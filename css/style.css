@@ -553,3 +553,15 @@ td.angka, th.angka { text-align: right; white-space: nowrap; }
 }
 /* skala cetak dikendalikan app.js lewat beforeprint/afterprint —
    di layar skala mengikuti lebar layar, di kertas skala pas satu halaman */
+
+/* papan nama pekerjaan di peta aplikasi */
+.label-pekerjaan {
+  background: rgba(255,255,255,.95);
+  border: 1px solid #90a4ae; border-left: 4px solid #90a4ae;
+  border-radius: 8px; padding: 3px 8px;
+  font-size: 10.5px; font-weight: 800; color: #37474f;
+  white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+  width: max-content !important; height: auto !important;
+}
+.label-pekerjaan.aktif { border-color: var(--biru); border-left-color: var(--biru); color: var(--biru-tua); }
+.label-pekerjaan small { display: block; font-weight: 600; font-size: 9.5px; color: #607d8b; }

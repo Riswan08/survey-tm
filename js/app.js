@@ -817,6 +817,22 @@ function render() {
         }).addTo(layerGaris);
       }
     }
+    // papan nama pekerjaan di peta — petugas/role lain langsung tahu ini
+    // pekerjaan apa, jenisnya apa, siapa & dari unit mana
+    if (daftar.length) {
+      const tengah = daftar[Math.floor(daftar.length / 2)];
+      const petugasG = [...new Set(daftar.map(p => p.petugas).filter(Boolean))].join(', ');
+      const ulpG = [...new Set(daftar.map(p => p.ulp).filter(Boolean))].join(', ');
+      L.marker([tengah.lat, tengah.lng], {
+        icon: L.divIcon({
+          className: 'label-pekerjaan' + (aktif ? ' aktif' : ''),
+          html: `⚡ ${label || labelAktif || 'Pekerjaan tanpa nama'}` +
+            ((petugasG || ulpG) ? `<small>👤 ${petugasG || '—'}${ulpG ? ' · 🏢 ' + ulpG : ''}</small>` : ''),
+          iconSize: null, iconAnchor: [0, 42],
+        }),
+        interactive: false,
+      }).addTo(layerGaris);
+    }
   });
 
   // garis jaringan eksisting: aset bawaan + titik survey + koreksi sambungan
@@ -922,6 +938,11 @@ function popupTiang(pole) {
       <b>Biaya titik ini: ${rupiah(biayaPerTiang(pole).total)}</b>
     </div>`;
   }
+  // identitas pekerjaan & pembuat — terbaca oleh petugas/role lain
+  const infoPekerjaan =
+    (pole.pekerjaan ? `⚡ <b>${pole.pekerjaan}</b><br>` : '') +
+    (pole.petugas ? `👤 ${pole.petugas}${pole.ulp ? ' · 🏢 ' + pole.ulp : ''}<br>` : '');
+  if (infoPekerjaan) isi += `<div class="pinfo" style="border-top:1px solid #e4e9ee;margin-top:5px;padding-top:5px">${infoPekerjaan}</div>`;
   // tombol ubah hanya untuk pembuat titik / admin — orang lain cukup melihat
   if (bolehUbahTitik(pole)) {
     div.innerHTML = isi + `
@@ -2118,11 +2139,9 @@ function gabungStatusPekerjaanUnit(masuk) {
 
 function renderPerluasan() {
   const wadah = $('#isi-perluasan');
+  // SEMUA pekerjaan di proyek (termasuk milik petugas lain) — bukan hanya yang aktif
   const grup = {};
-  polesRencana().forEach(p => {
-    const k = p.pekerjaan || '(tanpa nama pekerjaan)';
-    (grup[k] = grup[k] || []).push(p);
-  });
+  grupRencanaPerPekerjaan().forEach((daftar, k) => { grup[k || '(tanpa nama pekerjaan)'] = daftar; });
   const semuaNama = Object.keys(grup);
   if (!semuaNama.length) {
     wadah.innerHTML = `<p class="catatan-kecil">Belum ada titik rencana di proyek ini. Isi
@@ -2134,6 +2153,8 @@ function renderPerluasan() {
     const daftar = grup[nama];
     const jtr = daftar.filter(p => konstruksiTR(p.konstruksi)).length;
     const jtm = daftar.length - jtr;
+    const petugasG = [...new Set(daftar.map(p => p.petugas).filter(Boolean))].join(', ') || '—';
+    const ulpG = [...new Set(daftar.map(p => p.ulp).filter(Boolean))].join(', ') || '—';
     let rute = 0;
     for (let i = 1; i < daftar.length; i++) {
       const d = haversine(daftar[i - 1], daftar[i]);
@@ -2151,7 +2172,8 @@ function renderPerluasan() {
         <div class="nm">${nama} <span class="badge-skor" style="background:${st.warna}">${st.nama}</span></div>
         <div class="dt">🗼 ${daftar.length} tiang (JTM ${jtm} · JTR ${jtr}) ·
           ${rute >= 1000 ? angka(rute / 1000, 2) + ' km' : angka(rute, 0) + ' m'} ·
-          ± ${rupiah(biaya)} <small>(belum termasuk penghantar)</small></div>
+          ± ${rupiah(biaya)} <small>(belum termasuk penghantar)</small><br>
+          👤 ${petugasG} · 🏢 ${ulpG}</div>
       </div>
       <div class="aksi"><button class="tombol utama kecil" data-a="peta">📍</button></div>`;
     div.querySelector('[data-a=peta]').onclick = () => {
