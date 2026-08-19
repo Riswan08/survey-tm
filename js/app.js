@@ -347,8 +347,27 @@ function warnaSkor(skor) {
 }
 
 // titik rencana = rantai jaringan yang dihitung RAB & jaraknya;
-// aset eksisting & calon pelanggan berada di luar rantai
-const polesRencana = () => state.poles.filter(p => !p.mode || p.mode === 'rencana');
+// aset eksisting & calon pelanggan berada di luar rantai.
+// PENTING: rantai TIDAK pernah menyeberang pekerjaan — titik rencana milik
+// pekerjaan/petugas lain (hasil sinkronisasi unit) tidak digabung ke rute,
+// RAB, maupun live survey pekerjaan yang sedang dikerjakan.
+function grupRencanaPerPekerjaan() {
+  const grup = new Map(); // label pekerjaan -> daftar titik (urut simpan)
+  state.poles.filter(p => !p.mode || p.mode === 'rencana').forEach(p => {
+    const k = p.pekerjaan || '';
+    if (!grup.has(k)) grup.set(k, []);
+    grup.get(k).push(p);
+  });
+  return grup;
+}
+
+const polesRencana = () => {
+  // rantai AKTIF = pekerjaan pada Identitas Pekerjaan saat ini;
+  // titik tanpa label ikut serta (akan menerima label itu saat disimpan)
+  const label = labelPekerjaan();
+  return state.poles.filter(p => (!p.mode || p.mode === 'rencana') &&
+    (!p.pekerjaan || p.pekerjaan === label));
+};
 
 function normalisasiKoreksi(daftar) {
   return (Array.isArray(daftar) ? daftar : [])
@@ -779,19 +798,26 @@ function render() {
   layerTiang.clearLayers();
   layerGaris.clearLayers();
 
-  // garis jaringan + label jarak per gawang — hanya titik rencana
-  const rencana = polesRencana();
-  if (rencana.length > 1) {
-    L.polyline(rencana.map(p => [p.lat, p.lng]), { color: '#0c6bb5', weight: 3, dashArray: '6 4' }).addTo(layerGaris);
-    for (let i = 1; i < rencana.length; i++) {
-      const a = rencana[i - 1], b = rencana[i];
+  // garis rute rencana per PEKERJAAN — pekerjaan/petugas berbeda tidak pernah
+  // tersambung; label jarak hanya untuk pekerjaan yang sedang aktif
+  const labelAktif = labelPekerjaan();
+  grupRencanaPerPekerjaan().forEach((daftar, label) => {
+    const aktif = !label || label === labelAktif;
+    for (let i = 1; i < daftar.length; i++) {
+      const a = daftar[i - 1], b = daftar[i];
       const d = haversine(a, b);
-      L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
-        icon: L.divIcon({ className: 'label-jarak', html: `${angka(d, 0)} m`, iconSize: null }),
-        interactive: false,
+      if (d > 2000) continue; // lompatan antar lokasi — bukan satu bentangan
+      L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
+        color: '#0c6bb5', weight: aktif ? 3 : 2, dashArray: '6 4', opacity: aktif ? 1 : .55,
       }).addTo(layerGaris);
+      if (aktif) {
+        L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
+          icon: L.divIcon({ className: 'label-jarak', html: `${angka(d, 0)} m`, iconSize: null }),
+          interactive: false,
+        }).addTo(layerGaris);
+      }
     }
-  }
+  });
 
   // garis jaringan eksisting: aset bawaan + titik survey + koreksi sambungan
   const jaringan = sambunganFinal();
@@ -2348,13 +2374,23 @@ function eksporKML() {
       <Point><coordinates>${p.lng},${p.lat},0</coordinates></Point>
     </Placemark>`;
   }).join('');
-  const rencanaKML = polesRencana();
-  if (rencanaKML.length > 1) {
-    plek += `
-    <Placemark><name>Rute Rencana Jaringan TM</name>
-      <LineString><coordinates>${rencanaKML.map(p => `${p.lng},${p.lat},0`).join(' ')}</coordinates></LineString>
+  // rute per PEKERJAAN (dipecah pada lompatan > 2 km) — tidak menyambung lintas pekerjaan
+  grupRencanaPerPekerjaan().forEach((daftar, label) => {
+    let seg = daftar.length ? [daftar[0]] : [];
+    const dorong = () => {
+      if (seg.length > 1) {
+        plek += `
+    <Placemark><name>Rute ${esc(label || 'Rencana Jaringan')}</name>
+      <LineString><coordinates>${seg.map(p => `${p.lng},${p.lat},0`).join(' ')}</coordinates></LineString>
     </Placemark>`;
-  }
+      }
+    };
+    for (let i = 1; i < daftar.length; i++) {
+      if (haversine(daftar[i - 1], daftar[i]) > 2000) { dorong(); seg = [daftar[i]]; }
+      else seg.push(daftar[i]);
+    }
+    dorong();
+  });
   const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Si CAKRA — Survey Aset Distribusi</name>${plek}
 </Document></kml>`;
@@ -2702,6 +2738,7 @@ function gambarLembar() {
   let adaSUTR = false, adaSUTM = segmenEks.length > 0; // jaringan eksisting = SUTM
   for (let i = 1; i < rencana.length; i++) {
     const a = rencana[i - 1], b = rencana[i];
+    if (haversine(a, b) > 2000) continue; // lompatan antar lokasi — bukan satu bentangan
     const segTR = konstruksiTR(a.konstruksi) || konstruksiTR(b.konstruksi);
     if (segTR) adaSUTR = true; else adaSUTM = true;
     L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
@@ -2764,6 +2801,9 @@ function gambarLembar() {
         interactive: false,
       }).addTo(layerLembar);
     } else {
+      // hanya titik rencana PEKERJAAN AKTIF yang masuk gambar — pekerjaan lain
+      // (hasil sinkronisasi unit) tidak diikutkan agar gambar tidak tercampur
+      if (!indeksRencana.has(p.uid)) return;
       // lencana konstruksi: kode di atas, "urutan jenis | tinggi tiang" di bawah.
       // Dipasang MENYAMPING tegak lurus arah rute, berselang-seling kiri/kanan —
       // titik taging, garis, dan label jarak tetap terlihat walau tiang berdekatan.
