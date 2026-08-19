@@ -645,14 +645,35 @@ function sambunganFinal() {
 // titik rencana PERTAMA otomatis ditarik garis suplai ke tiang eksisting
 // terdekat (maks 500 m). Jaraknya ikut dihitung di penghantar & jasa tarik.
 // Bisa diputus lewat mode Koreksi Sambungan (lalu sambung manual ke tiang lain).
-function suplaiTerdekat() {
-  const rencana = polesRencana();
-  if (!rencana.length) return null;
-  const awal = rencana[0];
-  const uidRencana = new Set(rencana.map(p => p.uid));
+// titik sambung suatu rantai pekerjaan ke jaringan eksisting.
+// 1) MANUAL menang: sambungan yang dibuat lewat mode Koreksi (ketuk tiang
+//    pekerjaan lalu tiang eksisting) = titik sambung pilihan surveyor.
+// 2) Tanpa manual: otomatis ke tiang TM eksisting terdekat (maks 500 m).
+function suplaiUntuk(daftar) {
+  if (!daftar || !daftar.length) return null;
+  const uidRantai = new Set(daftar.map(p => p.uid));
+  const posisi = posisiSemua();
+
+  // sambungan MANUAL: koreksi 'tambah' yang menghubungkan rantai ini ke luar rantai
+  let manual = null;
+  (state.koreksi || []).forEach(k => {
+    if (k.aksi !== 'tambah') return;
+    const aDi = uidRantai.has(k.a), bDi = uidRantai.has(k.b);
+    if (aDi === bDi) return; // dua-duanya di dalam / di luar rantai — bukan titik sambung
+    const luar = posisi.get(aDi ? k.b : k.a);
+    const dalam = posisi.get(aDi ? k.a : k.b);
+    if (!luar || !dalam) return;
+    if (!manual || (k.diubah || 0) > manual.diubah) {
+      manual = { dari: luar, ke: dalam, jarak: haversine(luar, dalam), manual: true, diubah: k.diubah || 0 };
+    }
+  });
+  if (manual) return manual;
+
+  // otomatis: tiang eksisting terdekat dari titik awal rantai
+  const awal = daftar[0];
   let terbaik = null;
   const uji = (p) => {
-    if (uidRencana.has(p.uid)) return;
+    if (uidRantai.has(p.uid)) return;
     const d = haversine(awal, p);
     if (!terbaik || d < terbaik.jarak) terbaik = { dari: p, jarak: d };
   };
@@ -665,6 +686,10 @@ function suplaiTerdekat() {
     k.aksi === 'hapus' && kunciPasangan(k.a, k.b) === kunciPasangan(terbaik.dari.uid, awal.uid));
   if (diputus) return null;
   return { dari: terbaik.dari, ke: awal, jarak: terbaik.jarak };
+}
+
+function suplaiTerdekat() {
+  return suplaiUntuk(polesRencana());
 }
 
 // ---------------- MODE KOREKSI SAMBUNGAN ----------------
@@ -1430,7 +1455,9 @@ function namaPetugasSaatIni() {
 }
 
 function bolehUbahTitik(p) {
-  if (typeof peranSesi === 'function' && peranSesi() === 'admin') return true;
+  // admin & manajemen (perencana/manajer) boleh mengubah titik siapa pun;
+  // surveyor hanya miliknya sendiri
+  if (typeof bolehKelolaUsulan === 'function' && bolehKelolaUsulan()) return true;
   const pemilik = (p.petugas || '').trim().toLowerCase();
   return !pemilik || pemilik === namaPetugasSaatIni(); // tanpa pemilik = bebas (data lama/impor)
 }
@@ -2221,6 +2248,12 @@ function renderPerluasan() {
     // tahap tersimpan per NAMA PEKERJAAN (tanpa embel-embel petugas)
     const stKey = (statusPekerjaanUnit[daftar[0].pekerjaan || '(tanpa nama pekerjaan)'] || {}).status;
     const st = STATUS_PEKERJAAN[stKey] || STATUS_PEKERJAAN.survey;
+    // titik sambung ke jaringan eksisting (manual via mode Koreksi menang; else otomatis)
+    const suplai = suplaiUntuk(daftar);
+    const infoSambung = suplai
+      ? `🔌 Sambung dari <b>${suplai.dari.nama}</b> · ${angka(suplai.jarak, 0)} m (${suplai.manual ? 'ditentukan manual' : 'otomatis terdekat'})`
+      : '🔌 Belum ada titik sambung ke jaringan eksisting';
+    const bolehEdit = typeof bolehKelolaUsulan === 'function' && bolehKelolaUsulan();
     const div = document.createElement('div');
     div.className = 'item-tiang';
     div.innerHTML = `
@@ -2230,16 +2263,76 @@ function renderPerluasan() {
         <div class="dt">🗼 ${daftar.length} tiang (JTM ${jtm} · JTR ${jtr}) ·
           ${rute >= 1000 ? angka(rute / 1000, 2) + ' km' : angka(rute, 0) + ' m'} ·
           ± ${rupiah(biaya)} <small>(belum termasuk penghantar)</small><br>
-          👤 ${petugasG} · 🏢 ${ulpG}</div>
+          👤 ${petugasG} · 🏢 ${ulpG}<br>${infoSambung}</div>
       </div>
-      <div class="aksi"><button class="tombol utama kecil" data-a="peta">📍</button></div>`;
+      <div class="aksi">
+        ${bolehEdit ? '<button class="tombol polos kecil" data-a="edit" title="Edit jenis/nama/ULP pekerjaan">✏️</button>' : ''}
+        <button class="tombol polos kecil" data-a="sambung" title="Tentukan titik sambung ke jaringan eksisting">🔌</button>
+        <button class="tombol utama kecil" data-a="peta">📍</button>
+      </div>`;
     div.querySelector('[data-a=peta]').onclick = () => {
       tutupModal('modal-perluasan');
       map.fitBounds(daftar.map(p => [p.lat, p.lng]), { padding: [60, 60] });
       toast(`📍 Lokasi pekerjaan: ${nama}`);
     };
+    const btnEdit = div.querySelector('[data-a=edit]');
+    if (btnEdit) btnEdit.onclick = () => bukaEditPekerjaan(daftar);
+    div.querySelector('[data-a=sambung]').onclick = () => {
+      tutupModal('modal-perluasan');
+      map.fitBounds(daftar.map(p => [p.lat, p.lng]), { padding: [80, 80] });
+      if (!modeKoreksi) toggleModeKoreksi();
+      toast('🔌 Ketuk salah satu tiang pekerjaan ini, lalu ketuk tiang JARINGAN EKSISTING (hijau) — itulah titik sambungnya. RAB & gambar mengikuti.');
+    };
     wadah.appendChild(div);
   });
+}
+
+// ---------------- EDIT IDENTITAS PEKERJAAN (admin & manajemen) ----------------
+let editPekerjaanUids = [];
+
+function bukaEditPekerjaan(daftar) {
+  editPekerjaanUids = daftar.map(p => p.uid);
+  const contoh = daftar[0];
+  const label = contoh.pekerjaan || '';
+  // pisahkan label menjadi jenis + nama
+  let jenisK = 'PERLUASAN_JTM', namaP = label;
+  for (const [k, n] of Object.entries(JENIS_PEKERJAAN)) {
+    if (label === n) { jenisK = k; namaP = ''; break; }
+    if (label.startsWith(n + ' — ')) { jenisK = k; namaP = label.slice(n.length + 3); break; }
+  }
+  $('#ep-jenis').innerHTML = Object.entries(JENIS_PEKERJAAN)
+    .map(([k, n]) => `<option value="${k}" ${k === jenisK ? 'selected' : ''}>${n}</option>`).join('');
+  $('#ep-nama').value = namaP;
+  $('#ep-ulp').innerHTML = '<option value="">— tidak diubah —</option>' + DAFTAR_ULP
+    .map(u => `<option ${u === (contoh.ulp || '') ? 'selected' : ''}>${u}</option>`).join('');
+  $('#ep-info').textContent = `${daftar.length} titik (petugas: ${contoh.petugas || '—'}) akan diperbarui dan tersinkron ke semua perangkat.`;
+  bukaModal('modal-edit-pekerjaan');
+}
+
+function simpanEditPekerjaan() {
+  const jenisK = $('#ep-jenis').value;
+  const namaP = $('#ep-nama').value.trim().slice(0, 80);
+  const ulp = $('#ep-ulp').value;
+  const labelBaru = (`${JENIS_PEKERJAAN[jenisK] || ''}${namaP ? ' — ' + namaP : ''}`).trim().slice(0, 100);
+  const set = new Set(editPekerjaanUids);
+  let n = 0, labelLama = '';
+  state.poles.forEach(p => {
+    if (!set.has(p.uid) || !bolehUbahTitik(p)) return;
+    labelLama = labelLama || p.pekerjaan || '';
+    p.pekerjaan = labelBaru;
+    if (ulp) p.ulp = ulp;
+    p.diubah = Date.now();
+    n++;
+  });
+  // tahap yang sudah berjalan ikut ke nama baru (tampilan lokal)
+  if (labelLama && statusPekerjaanUnit[labelLama] && !statusPekerjaanUnit[labelBaru]) {
+    statusPekerjaanUnit[labelBaru] = { ...statusPekerjaanUnit[labelLama] };
+    localStorage.setItem(KUNCI_STATUS_PEKERJAAN, JSON.stringify(statusPekerjaanUnit));
+  }
+  simpan(); render(); renderPerluasan();
+  tutupModal('modal-edit-pekerjaan');
+  toast(n ? `✏️ ${n} titik diperbarui menjadi "${labelBaru}"${ulp ? ' (' + ulp + ')' : ''} — tersinkron otomatis`
+          : 'Tidak ada titik yang boleh Anda ubah di pekerjaan ini');
 }
 
 // ---------------- MASTER HARGA TERPUSAT (FR-15) ----------------
@@ -3227,6 +3320,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btn-rab').onclick = renderRAB;
   $('#btn-tugas').onclick = () => { renderTugas(); bukaModal('modal-tugas'); };
   $('#btn-perluasan').onclick = () => { renderPerluasan(); bukaModal('modal-perluasan'); };
+  $('#ep-simpan').onclick = simpanEditPekerjaan;
   perbaruiBadgeTugas();
   $('#btn-cari').onclick = togglePanelCari;
   $('#cari-tombol').onclick = jalankanPencarian;

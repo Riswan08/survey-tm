@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=57">
+  <link rel="stylesheet" href="css/style.css?v=58">
 </head>
 <body>
 
@@ -212,6 +212,27 @@
     </div>
   </div>
 
+  <!-- ===== MODAL: EDIT PEKERJAAN (admin & manajemen) ===== -->
+  <div class="modal-latar" id="modal-edit-pekerjaan">
+    <div class="modal">
+      <div class="modal-kepala">✏️ Edit Identitas Pekerjaan
+        <button class="tutup" data-tutup="modal-edit-pekerjaan">×</button></div>
+      <div class="modal-isi">
+        <div class="form-grup"><label>Jenis Pekerjaan</label><select id="ep-jenis"></select></div>
+        <div class="form-grup"><label>Nama Pekerjaan / Lokasi</label>
+          <input type="text" id="ep-nama" maxlength="80" placeholder="mis. Dusun Waraka"></div>
+        <div class="form-grup"><label>Lokasi Pekerjaan (ULP)</label><select id="ep-ulp"></select></div>
+        <p class="catatan-kecil" id="ep-info"></p>
+        <p class="catatan-kecil">Perubahan tagging per titik (konstruksi, tiang, posisi — biaya ikut berubah)
+          dilakukan lewat peta: ketuk titiknya → ✏️ Edit. Admin &amp; manajemen dapat mengedit titik siapa pun.</p>
+      </div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-edit-pekerjaan">Batal</button>
+        <button class="tombol utama" id="ep-simpan">💾 Simpan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MODAL: PENGATURAN ===== -->
   <div class="modal-latar" id="modal-pengaturan">
     <div class="modal">
@@ -397,9 +418,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=57"></script>
-  <script src="js/app.js?v=57"></script>
-  <script src="js/masuk.js?v=57"></script>
+  <script src="js/data.js?v=58"></script>
+  <script src="js/app.js?v=58"></script>
+  <script src="js/masuk.js?v=58"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
