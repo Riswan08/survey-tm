@@ -638,9 +638,9 @@ function renderAsetStatis() {
   if (!cacheMarkerAset.size) {
     layerAset.clearLayers();
     asetStatis.forEach(p => {
-      // TM hijau tua · TR hijau muda (satu keluarga jaringan eksisting)
+      // TM hijau tua · TR kuning (level tegangan langsung terbedakan)
       const cm = L.circleMarker([p.lat, p.lng], { radius: asetTRKah(p) ? 3.5 : 4, weight: 1, color: '#fff',
-        fillColor: asetTRKah(p) ? '#7cb342' : '#43a047', fillOpacity: .95 });
+        fillColor: asetTRKah(p) ? '#fbc02d' : '#43a047', fillOpacity: .95 });
       cm.on('click', () => { if (modeKoreksi) { cm.closePopup(); pilihKoreksi(p.uid); } });
       cm.addTo(layerAset);
       cacheMarkerAset.set(p.uid, { cm, p });
@@ -961,7 +961,7 @@ function render() {
   });
 
   // garis jaringan eksisting: aset bawaan + titik survey + koreksi sambungan
-  // — TM hijau utuh, TR hijau putus-putus (level tegangan berbeda)
+  // — TM hijau utuh, TR kuning putus-putus (level tegangan berbeda)
   const jaringan = sambunganFinal();
   const segmenTM = [], segmenTR = [];
   jaringan.edges.forEach(([a, b]) => {
@@ -973,7 +973,7 @@ function render() {
     L.polyline(segmenTM, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerGaris);
   }
   if (segmenTR.length) {
-    L.polyline(segmenTR, { color: '#558b2f', weight: 2, opacity: .8, dashArray: '5 6', smoothFactor: 2.5 }).addTo(layerGaris);
+    L.polyline(segmenTR, { color: '#f9a825', weight: 2, opacity: .8, dashArray: '5 6', smoothFactor: 2.5 }).addTo(layerGaris);
   }
 
   // garis suplai: rencana baru mengambil listrik dari tiang eksisting terdekat
@@ -3144,7 +3144,8 @@ function gambarLembar() {
     L.polyline(segmenEksTM, { color: WARNA_LEMBAR.eksisting, weight: 3.5, smoothFactor: 2 }).addTo(layerLembar);
   }
   if (segmenEksTR.length) {
-    L.polyline(segmenEksTR, { color: WARNA_LEMBAR.eksisting, weight: 2.5, dashArray: '7 7', smoothFactor: 2 }).addTo(layerLembar);
+    // jaringan TR eksisting: kuning putus-putus (dibedakan dari TM)
+    L.polyline(segmenEksTR, { color: '#f9a825', weight: 2.5, dashArray: '7 7', smoothFactor: 2 }).addTo(layerLembar);
   }
 
   // rute rencana per gawang: SUTR (konstruksi JTR) putus-putus, SUTM utuh + label jarak
