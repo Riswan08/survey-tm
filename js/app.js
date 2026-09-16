@@ -587,27 +587,33 @@ function initPeta() {
   });
 }
 
-// ---------------- LAPISAN ASET TM BAWAAN ----------------
-// data/aset-tm.json = inventaris tiang TM eksisting unit (impor Excel).
-// Selalu tampil di peta (ter-cache offline oleh service worker), read-only,
-// TIDAK membebani localStorage. Ketuk markernya → "Survey Aset Ini" untuk
-// menilai kondisi/temuan (tiang jadi titik survey dengan uid yang sama,
-// sehingga tidak dobel saat sinkronisasi).
+// ---------------- LAPISAN ASET TM & TR BAWAAN ----------------
+// data/aset-tm.json + data/aset-tr.json = inventaris tiang TM & TR eksisting
+// unit (impor Excel). Selalu tampil di peta (ter-cache offline oleh service
+// worker), read-only, TIDAK membebani localStorage. Ketuk markernya →
+// "Survey Aset Ini" untuk menilai kondisi/temuan (tiang jadi titik survey
+// dengan uid yang sama, sehingga tidak dobel saat sinkronisasi).
 let asetStatis = [];
 
+const asetTRKah = (p) => p && p.jenisAset === 'TIANG_TR';
+
 async function muatAsetStatis() {
-  try {
-    const res = await fetch('data/aset-tm.json');
-    if (!res.ok) return;
-    const d = await res.json();
-    asetStatis = (Array.isArray(d.poles) ? d.poles : [])
-      .filter(p => p && typeof p.uid === 'string' && isFinite(p.lat) && isFinite(p.lng));
-    render(); // gambar ulang termasuk garis jaringan aset + koreksi
-    // pemakaian pertama (belum ada titik survey): fokuskan peta ke wilayah aset
-    if (asetStatis.length && !state.poles.length) {
-      map.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
-    }
-  } catch (e) { /* offline sebelum sempat ter-cache — biarkan, coba lagi saat online */ }
+  const hasil = await Promise.all(['data/aset-tm.json', 'data/aset-tr.json'].map(async (f) => {
+    try {
+      const res = await fetch(f);
+      if (!res.ok) return [];
+      const d = await res.json();
+      return (Array.isArray(d.poles) ? d.poles : [])
+        .filter(p => p && typeof p.uid === 'string' && isFinite(p.lat) && isFinite(p.lng));
+    } catch (e) { return []; /* offline sebelum sempat ter-cache — coba lagi saat online */ }
+  }));
+  asetStatis = hasil.flat();
+  if (!asetStatis.length) return;
+  render(); // gambar ulang termasuk garis jaringan aset + koreksi
+  // pemakaian pertama (belum ada titik survey): fokuskan peta ke wilayah aset
+  if (!state.poles.length) {
+    map.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
+  }
 }
 
 // marker aset dibangun SEKALI (28 rb titik ≈ 1 dtk), lalu tiap render
@@ -632,7 +638,9 @@ function renderAsetStatis() {
   if (!cacheMarkerAset.size) {
     layerAset.clearLayers();
     asetStatis.forEach(p => {
-      const cm = L.circleMarker([p.lat, p.lng], { radius: 4, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .95 });
+      // TM hijau tua · TR hijau muda (satu keluarga jaringan eksisting)
+      const cm = L.circleMarker([p.lat, p.lng], { radius: asetTRKah(p) ? 3.5 : 4, weight: 1, color: '#fff',
+        fillColor: asetTRKah(p) ? '#7cb342' : '#43a047', fillOpacity: .95 });
       cm.on('click', () => { if (modeKoreksi) { cm.closePopup(); pilihKoreksi(p.uid); } });
       cm.addTo(layerAset);
       cacheMarkerAset.set(p.uid, { cm, p });
@@ -655,7 +663,7 @@ function popupAsetStatis(p) {
   const div = document.createElement('div');
   div.className = 'popup-tiang';
   div.innerHTML = `
-    <div class="pjudul">${p.nama} — Tiang TM (aset unit)</div>
+    <div class="pjudul">${p.nama} — Tiang ${asetTRKah(p) ? 'TR' : 'TM'} (aset unit)</div>
     <div class="pinfo">${p.catatan || ''}<br>${Number(p.lat).toFixed(6)}, ${Number(p.lng).toFixed(6)}</div>
     <div class="paksi"><button class="tombol utama kecil">📝 Survey Aset Ini</button></div>`;
   div.querySelector('button').onclick = () => {
@@ -732,17 +740,23 @@ function suplaiUntuk(daftar) {
   });
   if (manual) return manual;
 
-  // otomatis: tiang eksisting terdekat dari titik awal rantai
+  // otomatis: tiang eksisting terdekat dari titik awal rantai.
+  // Level tegangan dihormati: pekerjaan yang memuat JTM hanya boleh menyambung
+  // dari tiang TM; pekerjaan murni JTR boleh dari tiang TR maupun TM.
   const awal = daftar[0];
+  const adaJTM = daftar.some(p => !konstruksiTR(p.konstruksi));
   let terbaik = null;
   const uji = (p) => {
     if (uidRantai.has(p.uid)) return;
+    if (adaJTM && asetTRKah(p)) return;
     const d = haversine(awal, p);
     if (!terbaik || d < terbaik.jarak) terbaik = { dari: p, jarak: d };
   };
   const uidState = new Set(state.poles.map(p => p.uid));
   asetStatis.forEach(p => { if (!uidState.has(p.uid)) uji(p); });
-  state.poles.forEach(p => { if (p.mode === 'eksisting' && p.jenisAset === 'TIANG_TM') uji(p); });
+  state.poles.forEach(p => {
+    if (p.mode === 'eksisting' && (p.jenisAset === 'TIANG_TM' || p.jenisAset === 'TIANG_TR')) uji(p);
+  });
   if (!terbaik || terbaik.jarak > 500) return null;
   // dihormati bila surveyor memutus lewat koreksi sambungan
   const diputus = (state.koreksi || []).some(k =>
@@ -947,15 +961,19 @@ function render() {
   });
 
   // garis jaringan eksisting: aset bawaan + titik survey + koreksi sambungan
+  // — TM hijau utuh, TR hijau putus-putus (level tegangan berbeda)
   const jaringan = sambunganFinal();
-  const segmen = [];
+  const segmenTM = [], segmenTR = [];
   jaringan.edges.forEach(([a, b]) => {
     const p = jaringan.posisi.get(a), q = jaringan.posisi.get(b);
-    segmen.push([[p.lat, p.lng], [q.lat, q.lng]]);
+    (asetTRKah(p) || asetTRKah(q) ? segmenTR : segmenTM).push([[p.lat, p.lng], [q.lat, q.lng]]);
   });
-  if (segmen.length) {
+  if (segmenTM.length) {
     // smoothFactor tinggi = garis disederhanakan saat digambar → zoom jauh tetap mulus
-    L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerGaris);
+    L.polyline(segmenTM, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerGaris);
+  }
+  if (segmenTR.length) {
+    L.polyline(segmenTR, { color: '#558b2f', weight: 2, opacity: .8, dashArray: '5 6', smoothFactor: 2.5 }).addTo(layerGaris);
   }
 
   // garis suplai: rencana baru mengambil listrik dari tiang eksisting terdekat
@@ -3111,23 +3129,27 @@ function gambarLembar() {
   layerLembar.clearLayers();
   const s = state.settings;
 
-  // garis jaringan eksisting (aset bawaan + survey + koreksi) di sekitar proyek saja
+  // garis jaringan eksisting (aset bawaan + survey + koreksi) di sekitar proyek
+  // saja — TM utuh, TR putus-putus (sesuai level tegangan)
   const batas = L.latLngBounds(state.poles.map(p => [p.lat, p.lng])).pad(0.6);
   const jaringan = sambunganFinal();
-  const segmenEks = [];
+  const segmenEksTM = [], segmenEksTR = [];
   jaringan.edges.forEach(([a, b]) => {
     const p = jaringan.posisi.get(a), q = jaringan.posisi.get(b);
     if (batas.contains([p.lat, p.lng]) || batas.contains([q.lat, q.lng])) {
-      segmenEks.push([[p.lat, p.lng], [q.lat, q.lng]]);
+      (asetTRKah(p) || asetTRKah(q) ? segmenEksTR : segmenEksTM).push([[p.lat, p.lng], [q.lat, q.lng]]);
     }
   });
-  if (segmenEks.length) {
-    L.polyline(segmenEks, { color: WARNA_LEMBAR.eksisting, weight: 3.5, smoothFactor: 2 }).addTo(layerLembar);
+  if (segmenEksTM.length) {
+    L.polyline(segmenEksTM, { color: WARNA_LEMBAR.eksisting, weight: 3.5, smoothFactor: 2 }).addTo(layerLembar);
+  }
+  if (segmenEksTR.length) {
+    L.polyline(segmenEksTR, { color: WARNA_LEMBAR.eksisting, weight: 2.5, dashArray: '7 7', smoothFactor: 2 }).addTo(layerLembar);
   }
 
   // rute rencana per gawang: SUTR (konstruksi JTR) putus-putus, SUTM utuh + label jarak
   const rencana = polesRencana();
-  let adaSUTR = false, adaSUTM = segmenEks.length > 0; // jaringan eksisting = SUTM
+  let adaSUTR = segmenEksTR.length > 0, adaSUTM = segmenEksTM.length > 0; // jaringan eksisting sesuai levelnya
   // sisi pohon rute — percabangan tergambar benar (titik ke titik terdekat sebelumnya)
   sisiRantai(rencana).forEach(({ a, b, d }) => {
     const segTR = konstruksiTR(a.konstruksi) || konstruksiTR(b.konstruksi);

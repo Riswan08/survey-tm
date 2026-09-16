@@ -341,18 +341,24 @@ function renderHargaTerpusat() {
   wadah.innerHTML = html;
 }
 
+const asetTRKahD = (p) => p && p.jenisAset === 'TIANG_TR';
+
 async function muatAsetStatis() {
-  try {
-    const res = await fetch('data/aset-tm.json');
-    if (!res.ok) return;
-    const d = await res.json();
-    asetStatis = (Array.isArray(d.poles) ? d.poles : [])
-      .filter(p => p && typeof p.uid === 'string' && isFinite(p.lat) && isFinite(p.lng));
-    renderPeta();
-    if (asetStatis.length && !poles.length) {
-      peta.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
-    }
-  } catch (e) { /* offline tanpa cache — lewati */ }
+  const hasil = await Promise.all(['data/aset-tm.json', 'data/aset-tr.json'].map(async (f) => {
+    try {
+      const res = await fetch(f);
+      if (!res.ok) return [];
+      const d = await res.json();
+      return (Array.isArray(d.poles) ? d.poles : [])
+        .filter(p => p && typeof p.uid === 'string' && isFinite(p.lat) && isFinite(p.lng));
+    } catch (e) { return []; /* offline tanpa cache — lewati */ }
+  }));
+  asetStatis = hasil.flat();
+  if (!asetStatis.length) return;
+  renderPeta();
+  if (!poles.length) {
+    peta.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
+  }
 }
 
 // ---------------- peta ----------------
@@ -365,8 +371,10 @@ function renderAsetDasbor(tersurvey) {
   if (!layerAsetD) return;
   if (!cacheMarkerAsetD.size && asetStatis.length) {
     asetStatis.forEach(p => {
-      const cm = L.circleMarker([p.lat, p.lng], { radius: 3.5, weight: 1, color: '#fff', fillColor: '#43a047', fillOpacity: .9 })
-        .bindPopup(`<b>${p.nama}</b> — Tiang TM (aset)<br>${p.catatan || ''}`);
+      // TM hijau tua · TR hijau muda (satu keluarga jaringan eksisting)
+      const cm = L.circleMarker([p.lat, p.lng], { radius: asetTRKahD(p) ? 3 : 3.5, weight: 1, color: '#fff',
+        fillColor: asetTRKahD(p) ? '#7cb342' : '#43a047', fillOpacity: .9 })
+        .bindPopup(`<b>${p.nama}</b> — Tiang ${asetTRKahD(p) ? 'TR' : 'TM'} (aset)<br>${p.catatan || ''}`);
       cm.addTo(layerAsetD);
       cacheMarkerAsetD.set(p.uid, cm);
     });
@@ -454,9 +462,14 @@ function renderPeta() {
     if (k.aksi === 'hapus') edges.delete(kunciPasangan(k.a, k.b));
     else tambahEdge(k.a, k.b);
   });
-  const segmen = [];
-  edges.forEach(([a, b]) => segmen.push([[posisi.get(a).lat, posisi.get(a).lng], [posisi.get(b).lat, posisi.get(b).lng]]));
-  if (segmen.length) L.polyline(segmen, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerTitik);
+  // jaringan eksisting: TM hijau utuh, TR hijau putus-putus
+  const segmenTM = [], segmenTR = [];
+  edges.forEach(([a, b]) => {
+    const p = posisi.get(a), q = posisi.get(b);
+    (asetTRKahD(p) || asetTRKahD(q) ? segmenTR : segmenTM).push([[p.lat, p.lng], [q.lat, q.lng]]);
+  });
+  if (segmenTM.length) L.polyline(segmenTM, { color: '#2e7d32', weight: 2.5, opacity: .85, smoothFactor: 2.5 }).addTo(layerTitik);
+  if (segmenTR.length) L.polyline(segmenTR, { color: '#558b2f', weight: 2, opacity: .8, dashArray: '5 6', smoothFactor: 2.5 }).addTo(layerTitik);
 
   // rute RENCANA PERLUASAN per pekerjaan (biru; JTR putus-putus) — lokasi
   // pekerjaan langsung terlihat di peta monitoring
