@@ -35,6 +35,29 @@ const DIR_APP = path.join(__dirname, '..'); // folder aplikasi (index.html dst.)
 
 if (!fs.existsSync(DIR_DATA)) fs.mkdirSync(DIR_DATA, { recursive: true });
 
+// ---------- PENYEMBUHAN DIRI: alamat VPS (sekali jalan, hanya di VPS) ----------
+// Nama gratis 103-143-12-183.domainesia.io MATI (domain domainesia.io terhapus
+// dari registri .io, Sep 2026) sehingga semua klien gagal sinkron. Pengganti:
+// 103-143-12-183.sslip.io — DNS publik gratis yang selalu menunjuk IP yang sama,
+// tanpa akun, tanpa konfigurasi. Saat layanan ini di-restart oleh cron
+// pembaruan otomatis, blok berikut menambahkan nama baru ke Caddy (nama lama
+// tetap dilayani bila DNS-nya kembali) lalu memuat ulang Caddy. Aman diulang:
+// hanya bekerja bila Caddyfile ada dan belum memuat sslip.io.
+try {
+  const CADDYFILE = '/etc/caddy/Caddyfile';
+  if (process.platform === 'linux' && fs.existsSync(CADDYFILE)) {
+    const isiCaddy = fs.readFileSync(CADDYFILE, 'utf8');
+    if (isiCaddy.includes('103-143-12-183.domainesia.io') && !isiCaddy.includes('sslip.io')) {
+      fs.writeFileSync(CADDYFILE, isiCaddy.replace('103-143-12-183.domainesia.io',
+        '103-143-12-183.sslip.io, 103-143-12-183.domainesia.io'));
+      require('child_process').execFile('systemctl', ['reload', 'caddy'], (e) => {
+        console.log(e ? '[cakra] gagal muat ulang Caddy: ' + e.message
+                      : '[cakra] Caddy kini melayani 103-143-12-183.sslip.io (pengganti domainesia.io yang mati)');
+      });
+    }
+  }
+} catch (e) { console.error('[cakra] migrasi alamat dilewati:', e.message); }
+
 // ---------- util ----------
 function kodeUnitValid(kode) {
   return typeof kode === 'string' && /^[A-Za-z0-9_-]{3,60}$/.test(kode);
