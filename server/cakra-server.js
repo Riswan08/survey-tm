@@ -50,13 +50,40 @@ try {
     if (isiCaddy.includes('103-143-12-183.domainesia.io') && !isiCaddy.includes('sslip.io')) {
       fs.writeFileSync(CADDYFILE, isiCaddy.replace('103-143-12-183.domainesia.io',
         '103-143-12-183.sslip.io, 103-143-12-183.domainesia.io'));
-      require('child_process').execFile('systemctl', ['reload', 'caddy'], (e) => {
-        console.log(e ? '[cakra] gagal muat ulang Caddy: ' + e.message
-                      : '[cakra] Caddy kini melayani 103-143-12-183.sslip.io (pengganti domainesia.io yang mati)');
-      });
+      console.log('[cakra] Caddyfile: 103-143-12-183.sslip.io ditambahkan (pengganti domainesia.io yang mati)');
     }
   }
 } catch (e) { console.error('[cakra] migrasi alamat dilewati:', e.message); }
+
+// ---------- DOKTER CADDY: pastikan konfigurasi valid & layanan berjalan ----------
+// Dijalankan tiap kali layanan cakra (re)start di VPS. Bila Caddyfile tidak
+// lolos validasi, tulis ulang konfigurasi baku yang diketahui benar (cadangan
+// disimpan), lalu Caddy DI-RESTART penuh — memulihkan keadaan apa pun
+// (termasuk proses caddy yang mati setelah muat-ulang gagal).
+try {
+  const CADDYFILE = '/etc/caddy/Caddyfile';
+  if (process.platform === 'linux' && fs.existsSync(CADDYFILE) && process.getuid && process.getuid() === 0) {
+    const { execFile } = require('child_process');
+    const KONFIG_BAKU = '103-143-12-183.sslip.io, 103-143-12-183.domainesia.io {\n\treverse_proxy localhost:8787\n}\n';
+    execFile('caddy', ['validate', '--config', CADDYFILE, '--adapter', 'caddyfile'], (errVal) => {
+      if (errVal) {
+        try {
+          fs.copyFileSync(CADDYFILE, CADDYFILE + '.rusak-' + Date.now());
+          fs.writeFileSync(CADDYFILE, KONFIG_BAKU);
+          console.log('[cakra] Caddyfile tidak valid — ditulis ulang dengan konfigurasi baku (cadangan disimpan)');
+        } catch (e2) { console.error('[cakra] gagal menulis Caddyfile:', e2.message); }
+      }
+      execFile('systemctl', ['restart', 'caddy'], (errR) => {
+        console.log(errR ? '[cakra] restart caddy gagal: ' + errR.message : '[cakra] caddy di-restart');
+        setTimeout(() => {
+          execFile('systemctl', ['is-active', 'caddy'], (e3, out) => {
+            console.log('[cakra] status caddy: ' + String(out || e3 && e3.message || '').trim());
+          });
+        }, 8000);
+      });
+    });
+  }
+} catch (e) { console.error('[cakra] dokter caddy dilewati:', e.message); }
 
 // ---------- util ----------
 function kodeUnitValid(kode) {
