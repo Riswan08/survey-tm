@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=72">
+  <link rel="stylesheet" href="css/style.css?v=73">
 </head>
 <body>
 
@@ -422,7 +422,8 @@
         <button class="tombol utama" id="lg-cetak">🖨 Cetak / Simpan PDF</button>
         <button class="tombol polos" id="lg-tutup">× Tutup</button>
       </div>
-      <p class="catatan-kecil" style="margin:6px 0 0">Atur peta (geser/zoom) persis seperti yang ingin dicetak, lalu 🖨 — pilih
+      <p class="catatan-kecil" style="margin:6px 0 0">Atur peta (geser/zoom) persis seperti yang ingin dicetak — <b>lingkaran keterangan
+        tiang bisa diseret</b> agar tidak menutupi gambar — lalu 🖨 — pilih
         <b>Save as PDF</b>, kertas <b>A4 Lanskap</b>, margin <b>None</b>. Butuh internet untuk citra satelit (atau tile yang sudah diunduh offline).</p>
     </div>
     <div class="lembar" id="lembar">
@@ -462,9 +463,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=72"></script>
-  <script src="js/app.js?v=72"></script>
-  <script src="js/masuk.js?v=72"></script>
+  <script src="js/data.js?v=73"></script>
+  <script src="js/app.js?v=73"></script>
+  <script src="js/masuk.js?v=73"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

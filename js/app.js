@@ -3118,6 +3118,7 @@ async function unduhSemuaPekerjaan() {
 // Dicetak lewat dialog browser → "Save as PDF", A4 lanskap, margin none.
 const WARNA_LEMBAR = { eksisting: '#111111', rencana: '#1e88e5', rehab: '#2e7d32' };
 let petaLembar = null, layerLembar = null;
+let penunjukLembar = []; // pembaru garis penunjuk lencana (disegarkan saat zoom)
 
 function tinggiTiang(kode) {
   const m = /(\d+)\s*m/.exec((MATERIALS[kode] || {}).nama || '');
@@ -3185,6 +3186,7 @@ function svgTrafo(jenis, warna) {
 
 function gambarLembar() {
   layerLembar.clearLayers();
+  penunjukLembar = [];
   const s = state.settings;
 
   // garis jaringan eksisting (aset bawaan + survey + koreksi) di sekitar
@@ -3306,15 +3308,30 @@ function gambarLembar() {
       const sisi = i % 2 ? -1 : 1; // ganjil kiri, genap kanan
       const J = 56;                 // jarak lencana dari titik (px)
       const ox = -dir.y * J * sisi, oy = dir.x * J * sisi;
-      L.marker([p.lat, p.lng], {
+      // lencana BISA DIGESER (seret) agar tidak menutupi gambar — saat dipindah,
+      // garis penunjuk tipis menghubungkannya kembali ke titik tiangnya
+      const lencana = L.marker([p.lat, p.lng], {
         icon: L.divIcon({
           className: '',
-          html: `<div class="lg-badge"><div class="k">${p.konstruksi.replace('-', '')}</div>
+          html: `<div class="lg-badge" title="Seret untuk memindahkan keterangan"><div class="k">${p.konstruksi.replace('-', '')}</div>
                  <div class="b">${urutanKonstruksi.get(p.uid) || 1} | ${tinggiTiang(p.tiang)}</div></div>`,
           iconSize: [44, 44], iconAnchor: [22 - ox, 22 - oy],
         }),
-        interactive: false,
+        draggable: true, autoPan: false, keyboard: false,
       }).addTo(layerLembar);
+      let garisPenunjuk = null;
+      const perbaruiPenunjuk = () => {
+        // ujung garis = pusat visual lencana (latlng + offset ikon)
+        const pusat = petaLembar.layerPointToLatLng(
+          petaLembar.latLngToLayerPoint(lencana.getLatLng()).add([ox, oy]));
+        const titikUjung = [[p.lat, p.lng], pusat];
+        if (!garisPenunjuk) {
+          garisPenunjuk = L.polyline(titikUjung,
+            { color: '#333', weight: 1.3, dashArray: '2 4', interactive: false }).addTo(layerLembar);
+        } else { garisPenunjuk.setLatLngs(titikUjung); }
+      };
+      lencana.on('drag dragend', perbaruiPenunjuk);
+      penunjukLembar.push(() => { if (garisPenunjuk) perbaruiPenunjuk(); });
     }
   });
 
@@ -3411,6 +3428,7 @@ function bukaLembarGambar() {
   $('#lembar-wrap').classList.remove('sembunyi');
   if (!petaLembar) {
     petaLembar = L.map('peta-lembar', { preferCanvas: true, zoomControl: true });
+    petaLembar.on('zoomend', () => penunjukLembar.forEach(f => f()));
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19, attribution: 'Esri World Imagery' }).addTo(petaLembar);
     layerLembar = L.layerGroup().addTo(petaLembar);
