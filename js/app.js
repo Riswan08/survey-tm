@@ -790,7 +790,7 @@ function batalPilihKoreksi() {
 
 function toggleModeKoreksi() {
   modeKoreksi = !modeKoreksi;
-  if (modeKoreksi && modeTaging) { modeTaging = false; $('#btn-tag').classList.remove('aktif'); $('#btn-tag').innerHTML = '🎯 Mode Taging'; }
+  if (modeKoreksi && modeTaging) { modeTaging = false; perbaruiTombolPekerjaan(); }
   batalPilihKoreksi();
   $('#btn-koreksi').classList.toggle('aktif', modeKoreksi);
   $('#btn-koreksi').innerHTML = modeKoreksi ? '🔗 Koreksi: AKTIF' : '🔗 Koreksi Sambungan';
@@ -1661,6 +1661,12 @@ function fixTerbaik() {
 
 function mulaiLive() {
   if (!navigator.geolocation) { toast('Perangkat tidak mendukung GPS'); return; }
+  // identitas pekerjaan wajib terisi dulu — titik live tercatat ke pekerjaan yang benar
+  if (!state.settings.namaPekerjaan || !state.settings.petugas) {
+    bukaBuatPekerjaan();
+    toast('📝 Isi identitas pekerjaan dulu — setelah Mulai, tekan 🚶 Live Survey lagi');
+    return;
+  }
   liveAktif = true; ikutiPeta = true;
   jejakTitik = []; posisiLive = null;
   markerLive = lingkarLive = garisJejak = garisKeTiang = null;
@@ -2427,6 +2433,46 @@ function bukaRABResmiUntuk(daftar) {
   $('#rb-lokasi').value = [lokasiP, daftar[0].ulp].filter(Boolean).join(' — ') || 'PT PLN (Persero) UP3 Masohi';
   $('#rb-nama2').value = daftar[0].petugas || '';
   bukaRABResmi();
+}
+
+// ---------------- BUAT / LANJUTKAN PEKERJAAN (alur input utama) ----------------
+// Pengganti "Mode Taging": petugas mengisi identitas pekerjaan DI AWAL (sekali),
+// lalu mode taging langsung aktif — semua titik (rencana & calon pelanggan)
+// otomatis tercatat ke pekerjaan itu; tidak ada lagi pekerjaan tanpa nama.
+function bukaBuatPekerjaan() {
+  const s = state.settings;
+  const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
+  $('#bp-jenis').innerHTML = Object.entries(JENIS_PEKERJAAN)
+    .map(([k, n]) => `<option value="${k}" ${k === s.jenisPekerjaan ? 'selected' : ''}>${n}</option>`).join('');
+  $('#bp-nama').value = s.namaPekerjaan || '';
+  const ulpAktif = s.lokasiUlp || sesi.ulp || '';
+  $('#bp-ulp').innerHTML = DAFTAR_ULP
+    .map(u => `<option ${u === ulpAktif ? 'selected' : ''}>${u}</option>`).join('');
+  $('#bp-petugas').value = s.petugas || sesi.petugas || '';
+  bukaModal('modal-buat-pekerjaan');
+}
+
+function mulaiPekerjaan() {
+  const nama = $('#bp-nama').value.trim();
+  if (!nama) { toast('⚠️ Isi dulu Nama Pekerjaan / Lokasinya'); $('#bp-nama').focus(); return; }
+  const petugas = $('#bp-petugas').value.trim();
+  if (!petugas) { toast('⚠️ Isi dulu Nama Petugas'); $('#bp-petugas').focus(); return; }
+  const s = state.settings;
+  s.jenisPekerjaan = $('#bp-jenis').value;
+  s.namaPekerjaan = nama.slice(0, 80);
+  s.lokasiUlp = $('#bp-ulp').value;
+  s.petugas = petugas.slice(0, 40);
+  simpan(); render();
+  tutupModal('modal-buat-pekerjaan');
+  modeTaging = true;
+  perbaruiTombolPekerjaan();
+  toast(`📝 "${labelPekerjaan()}" aktif — ketuk peta untuk menaruh titik (Rencana / Calon Pelanggan)`);
+}
+
+function perbaruiTombolPekerjaan() {
+  const b = $('#btn-tag');
+  b.classList.toggle('aktif', modeTaging);
+  b.innerHTML = modeTaging ? '✅ Taging AKTIF — ketuk peta · ⏹ selesai' : '📝 Buat Pekerjaan';
 }
 
 // ---------------- EDIT IDENTITAS PEKERJAAN (admin & manajemen) ----------------
@@ -3561,12 +3607,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // tombol
   $('#btn-gps').onclick = ambilTikorGPS;
+  // alur utama: Buat Pekerjaan → identitas terisi → taging aktif
   $('#btn-tag').onclick = () => {
-    modeTaging = !modeTaging;
-    $('#btn-tag').classList.toggle('aktif', modeTaging);
-    $('#btn-tag').innerHTML = modeTaging ? '🎯 Mode Taging: AKTIF' : '🎯 Mode Taging';
-    toast(modeTaging ? 'Ketuk peta untuk menaruh tiang' : 'Mode taging dimatikan');
+    if (modeTaging) {
+      modeTaging = false;
+      perbaruiTombolPekerjaan();
+      toast('✅ Taging selesai — pekerjaan tersimpan & tersinkron otomatis');
+    } else {
+      bukaBuatPekerjaan();
+    }
   };
+  $('#bp-mulai').onclick = mulaiPekerjaan;
   $('#btn-rab').onclick = () => { rencanaTampil = null; renderRAB(); };
   $('#btn-tugas').onclick = () => { renderTugas(); bukaModal('modal-tugas'); };
   $('#btn-perluasan').onclick = () => { renderPerluasan(); bukaModal('modal-perluasan'); };

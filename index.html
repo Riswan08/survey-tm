@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=70">
+  <link rel="stylesheet" href="css/style.css?v=71">
 </head>
 <body>
 
@@ -47,7 +47,7 @@
   <!-- ===== TOMBOL MELAYANG ===== -->
   <div id="fab-wrap">
     <button class="fab tag" id="btn-koreksi">🔗 Koreksi Sambungan</button>
-    <button class="fab tag" id="btn-tag">🎯 Mode Taging</button>
+    <button class="fab tag" id="btn-tag">📝 Buat Pekerjaan</button>
     <button class="fab gps" id="btn-gps">📍 Ambil Tikor GPS</button>
     <button class="fab live" id="btn-live">🚶 Live Survey</button>
   </div>
@@ -227,6 +227,29 @@
   </div>
 
   <!-- ===== MODAL: EDIT PEKERJAAN (admin & manajemen) ===== -->
+  <!-- ===== MODAL: BUAT / LANJUTKAN PEKERJAAN (alur input utama) ===== -->
+  <div class="modal-latar" id="modal-buat-pekerjaan">
+    <div class="modal">
+      <div class="modal-kepala">📝 Buat / Lanjutkan Pekerjaan
+        <button class="tutup" data-tutup="modal-buat-pekerjaan">×</button></div>
+      <div class="modal-isi">
+        <p class="catatan-kecil">Isi identitas pekerjaan <b>sekali di sini</b> — setelah Mulai, ketuk peta untuk
+          menaruh titik <b>🆕 Rencana</b> (tiang) maupun <b>👤 Calon Pelanggan</b>. Semua titik otomatis tercatat
+          ke pekerjaan ini dan langsung masuk database &amp; dasbor monitoring saat disimpan.</p>
+        <div class="form-grup"><label>Jenis Pekerjaan</label><select id="bp-jenis"></select></div>
+        <div class="form-grup"><label>Nama Pekerjaan / Lokasi (desa, dusun)</label>
+          <input type="text" id="bp-nama" maxlength="80" placeholder="mis. Komdigi Werinama Batuasa III"></div>
+        <div class="form-grup"><label>Lokasi Unit (ULP)</label><select id="bp-ulp"></select></div>
+        <div class="form-grup"><label>Nama Petugas / Surveyor</label>
+          <input type="text" id="bp-petugas" maxlength="40" placeholder="nama Anda"></div>
+      </div>
+      <div class="modal-kaki">
+        <button class="tombol polos" data-tutup="modal-buat-pekerjaan">Batal</button>
+        <button class="tombol utama" id="bp-mulai">✅ Mulai — Ketuk Peta untuk Menaruh Titik</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-latar" id="modal-edit-pekerjaan">
     <div class="modal">
       <div class="modal-kepala">✏️ Edit Identitas Pekerjaan
@@ -438,9 +461,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=70"></script>
-  <script src="js/app.js?v=70"></script>
-  <script src="js/masuk.js?v=70"></script>
+  <script src="js/data.js?v=71"></script>
+  <script src="js/app.js?v=71"></script>
+  <script src="js/masuk.js?v=71"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
