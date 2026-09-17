@@ -18,14 +18,14 @@
 // ------------------------------------------------------------
 const MATERIALS = {
   // --- Batang tiang BESI sesuai daftar jasa pemasangan unit ---
-  // (harga MATERIAL batang tiang tidak ada di lampiran — isi/ubah lewat 💰 Harga
-  //  Terpusat; jasa pemasangannya per jenis tanah di JASA_PASANG_TIANG bawah)
-  TIANG_12_200:  { nama: 'Tiang Besi 12 m / 200 daN',   satuan: 'btg', harga: 4200000, jasa: 0, kategori: 'tiang' },
-  TIANG_12_350:  { nama: 'Tiang Besi 12 m / 350 daN',   satuan: 'btg', harga: 5500000, jasa: 0, kategori: 'tiang' },
+  // HARGA MATERIAL TIANG = 0 (sesuai keputusan unit: tiang hanya memakai JASA
+  // pemasangan per jenis tanah — lihat JASA_PASANG_TIANG di bawah)
+  TIANG_12_200:  { nama: 'Tiang Besi 12 m / 200 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
+  TIANG_12_350:  { nama: 'Tiang Besi 12 m / 350 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
   TIANG_12_500:  { nama: 'Tiang Besi 12 m / 500 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
   TIANG_14_350:  { nama: 'Tiang Besi 14 m / 350 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
   TIANG_14_500:  { nama: 'Tiang Besi 14 m / 500 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
-  TIANG_13_350:  { nama: 'Tiang Beton 13 m / 350 daN',  satuan: 'btg', harga: 6500000, jasa: 0, kategori: 'tiang' },
+  TIANG_13_350:  { nama: 'Tiang Beton 13 m / 350 daN',  satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
   TIANG_BESI:    { nama: 'Tiang Besi (lainnya — harga sesuai kontrak)', satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
 
   // --- Besi UNP & siku (lampiran) ---
@@ -101,8 +101,8 @@ const MATERIALS = {
 
   // --- Tiang & material konstruksi JTR / Tegangan Rendah ---
   // (HARGA CONTOH — lampiran harga JTR belum tersedia; sesuaikan di Pengaturan)
-  TIANG_9_200:   { nama: 'Tiang Beton 9 m / 200 daN (TR)',        satuan: 'btg', harga: 2800000, jasa: 0, kategori: 'tiang' },
-  TIANG_9_350:   { nama: 'Tiang Beton 9 m / 350 daN (TR)',        satuan: 'btg', harga: 3400000, jasa: 0, kategori: 'tiang' },
+  TIANG_9_200:   { nama: 'Tiang Beton 9 m / 200 daN (TR)',        satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
+  TIANG_9_350:   { nama: 'Tiang Beton 9 m / 350 daN (TR)',        satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
   SUSP_SET:      { nama: 'Suspension Clamp + Bracket JTR (set)',  satuan: 'set', harga: 165000, jasa: 35000, kategori: 'material' },
   STRAIN_SET:    { nama: 'Strain Clamp / Fixed Dead End + Bracket JTR (set)', satuan: 'set', harga: 195000, jasa: 40000, kategori: 'material' },
   SS_STRIP:      { nama: 'Stainless Steel Strip + Stopping Buckle (set)', satuan: 'set', harga: 45000, jasa: 15000, kategori: 'material' },

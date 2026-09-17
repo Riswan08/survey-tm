@@ -1175,7 +1175,8 @@ function hitungRAB() {
     totalJasaKonstruksi += jmlJasa;
     return { kode, nama: MATERIALS[kode].nama, satuan: MATERIALS[kode].satuan, qty,
              harga: h, jasa: j, jmlMaterial, jmlJasa, jumlah: jmlMaterial + jmlJasa };
-  });
+  // baris tanpa nilai (mis. batang tiang — hanya memakai jasa pemasangan) disembunyikan
+  }).filter(b => b.jumlah > 0);
 
   // 2) penghantar: rute antar tiang rencana + sambungan suplai dari jaringan eksisting
   const rute = panjangRute();
