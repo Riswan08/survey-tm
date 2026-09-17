@@ -326,6 +326,7 @@ function normalisasiPole(p, indeks) {
     lat, lng,
     mode: (p.mode === 'eksisting' || p.mode === 'pelanggan') ? p.mode : 'rencana',
     namaPelanggan: typeof p.namaPelanggan === 'string' ? p.namaPelanggan.slice(0, 60) : '',
+    daya: typeof p.daya === 'string' ? p.daya.slice(0, 30) : '',
     fotoPelanggan: (() => {
       const f = (p.fotoPelanggan && typeof p.fotoPelanggan === 'object') ? p.fotoPelanggan : {};
       const bersih = {};
@@ -413,6 +414,23 @@ function sisiRantai(daftar, maks = 2000) {
     if (induk && jarakMin <= maks) sisi.push({ a: induk, b: daftar[i], d: jarakMin });
   }
   return sisi;
+}
+
+// calon pelanggan milik pekerjaan yang sedang ditampilkan (ikut rencanaTampil bila diisi) —
+// tampil di Gambar Rencana dengan nama & daya yang dimohon
+function pelangganRencana() {
+  if (rencanaTampil && rencanaTampil.length) {
+    const pkj = rencanaTampil[0].pekerjaan || '';
+    const ptg = (rencanaTampil[0].petugas || '').trim().toLowerCase();
+    return state.poles.filter(p => p.mode === 'pelanggan' &&
+      (p.pekerjaan || '') === pkj &&
+      (p.petugas || '').trim().toLowerCase() === ptg);
+  }
+  const label = labelPekerjaan();
+  const saya = (state.settings.petugas || '').trim().toLowerCase();
+  return state.poles.filter(p => p.mode === 'pelanggan' &&
+    (!p.pekerjaan || p.pekerjaan === label) &&
+    (!p.petugas || p.petugas.trim().toLowerCase() === saya));
 }
 
 // titik rantai aktif yang TERDEKAT dari suatu posisi (untuk live survey & pemeriksaan gawang)
@@ -1031,7 +1049,7 @@ function popupTiang(pole) {
     isi = `
     <div class="pjudul">👤 ${pole.namaPelanggan || pole.nama}</div>
     <div class="pinfo">
-      Calon pelanggan (${pole.nama})<br>
+      Calon pelanggan (${pole.nama})${pole.daya ? ' — <b>' + pole.daya + '</b>' : ''}<br>
       Eviden: <b>${lengkap}/${Object.keys(EVIDEN_PELANGGAN).length}</b> ${lengkap === Object.keys(EVIDEN_PELANGGAN).length ? '✅' : '⚠️ belum lengkap'}<br>
       ${pole.lat.toFixed(6)}, ${pole.lng.toFixed(6)}
       ${pole.catatan ? '<br>' + pole.catatan : ''}
@@ -1425,6 +1443,7 @@ function bukaFormTiang(id, latlng) {
 
   // calon pelanggan
   $('#f-nama-pelanggan').value = pole ? (pole.namaPelanggan || '') : '';
+  $('#f-daya').value = pole ? (pole.daya || '') : '';
   renderEvidenPelanggan();
 
   renderTemuanUsulan(pole);
@@ -1449,6 +1468,7 @@ function poleDariForm() {
     kondisi: draftKondisi,
     dampak: draftDampak,
     namaPelanggan: $('#f-nama-pelanggan').value.trim().slice(0, 60),
+    daya: $('#f-daya').value.trim().slice(0, 30),
     fotoPelanggan: { ...draftFotoP },
     temuan: [...document.querySelectorAll('#f-temuan input:checked')].map(i => i.value),
     // status usulan yang sudah berjalan dipertahankan; usulan baru = "diusulkan"
@@ -2653,12 +2673,12 @@ function eksporCSV() {
   if (pelangganCSV.length) {
     baris('');
     baris('DAFTAR CALON PELANGGAN');
-    baris('Kode', 'Nama (sesuai KTP)', 'Latitude', 'Longitude', 'Eviden Lengkap', 'KTP', 'KK', 'Bangunan Depan', 'Bangunan Belakang', 'Catatan');
+    baris('Kode', 'Nama (sesuai KTP)', 'Daya Dimohon', 'Latitude', 'Longitude', 'Eviden Lengkap', 'KTP', 'KK', 'Bangunan Depan', 'Bangunan Belakang', 'Catatan');
     pelangganCSV.forEach(p => {
       const f = p.fotoPelanggan || {};
       const ada = (k) => (f[k] ? 'ADA' : 'BELUM');
       const lengkap = Object.keys(EVIDEN_PELANGGAN).filter(k => f[k]).length;
-      baris(p.nama, (p.namaPelanggan || '').replace(/;/g, ','), p.lat, p.lng,
+      baris(p.nama, (p.namaPelanggan || '').replace(/;/g, ','), (p.daya || '').replace(/;/g, ','), p.lat, p.lng,
         `${lengkap}/${Object.keys(EVIDEN_PELANGGAN).length}`,
         ada('ktp'), ada('kk'), ada('depan'), ada('belakang'),
         (p.catatan || '').replace(/;/g, ','));
@@ -3193,7 +3213,7 @@ function gambarLembar() {
     indeksRencana.set(p.uid, i);
   });
   state.poles.forEach(p => {
-    if (p.mode === 'pelanggan') return; // calon pelanggan tidak masuk gambar rencana
+    if (p.mode === 'pelanggan') return; // calon pelanggan digambar terpisah di bawah
     const eksisting = p.mode === 'eksisting';
     const rehab = eksisting && (p.usulan || []).length > 0;
     const warna = eksisting ? (rehab ? WARNA_LEMBAR.rehab : WARNA_LEMBAR.eksisting) : WARNA_LEMBAR.rencana;
@@ -3239,16 +3259,38 @@ function gambarLembar() {
     }
   });
 
+  // CALON PELANGGAN pekerjaan ini: kotak ungu + label nama & daya yang dimohon
+  const pelangganG = pelangganRencana();
+  pelangganG.forEach(p => {
+    L.marker([p.lat, p.lng], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="width:11px;height:11px;background:#7b1fa2;border:1.5px solid #fff;border-radius:2px"></div>`,
+        iconSize: [11, 11], iconAnchor: [5, 5],
+      }),
+      interactive: false,
+    }).addTo(layerLembar);
+    L.marker([p.lat, p.lng], {
+      icon: L.divIcon({
+        className: 'lg-nama',
+        html: `${p.namaPelanggan || p.nama}${p.daya ? ' — ' + p.daya : ''}`,
+        iconAnchor: [-8, -4],
+      }),
+      interactive: false,
+    }).addTo(layerLembar);
+  });
+
   // legenda dinamis: baris keterangan tampil hanya bila datanya ada di gambar
   const eks = state.poles.filter(p => p.mode === 'eksisting');
   const tampilLegenda = {
     rehab: eks.some(p => (p.usulan || []).length),
     rencana: rencana.length > 0,
-    eksisting: segmenEks.length > 0 || eks.some(p => !(p.usulan || []).length),
+    eksisting: (segmenEksTM.length + segmenEksTR.length) > 0 || eks.some(p => !(p.usulan || []).length),
     sutr: adaSUTR,
     sutm: adaSUTM,
     cantol: eks.some(p => p.jenisAset === 'TRAFO_CANTOL'),
     portal: eks.some(p => p.jenisAset === 'TRAFO_PORTAL'),
+    pelanggan: pelangganG.length > 0,
   };
   document.querySelectorAll('#lembar [data-lg]').forEach(el => {
     el.style.display = tampilLegenda[el.dataset.lg] ? '' : 'none';
@@ -3256,9 +3298,20 @@ function gambarLembar() {
 }
 
 function bukaLembarGambar() {
-  // saat pekerjaan terpilih (menu ⚡): pusatkan peta hanya ke titik pekerjaan itu
-  const titikGambar = rencanaTampil || state.poles.filter(p => p.mode !== 'pelanggan');
-  if (!titikGambar.length) { toast('Belum ada titik survey untuk digambar'); return; }
+  // pusatkan peta ke titik PEKERJAAN YANG DIGAMBAR (rencana + calon pelanggannya) —
+  // bukan seluruh proyek, agar hasil cetak langsung fokus ke lokasi pekerjaan
+  let titikGambar = (rencanaTampil || polesRencana()).concat(pelangganRencana());
+  if (!titikGambar.length) {
+    // identitas di ⚙️ Pengaturan tidak cocok dengan pekerjaan mana pun:
+    // bila hanya ada SATU pekerjaan di proyek, langsung pakai itu; selain itu
+    // arahkan pengguna memilih pekerjaannya (mencegah lembar terbuka kosong)
+    const grup = [...grupRencanaPerPekerjaan().values()].filter(g => g.length);
+    if (grup.length === 1) { bukaLembarGambarUntuk(grup[0]); return; }
+    toast(grup.length
+      ? '⚠️ Pekerjaan Anda (identitas di ⚙️ Pengaturan) belum punya titik — buka menu ⚡ lalu ketuk 📄 pada pekerjaan yang dituju, atau pilih pekerjaannya di menu Ekspor'
+      : 'Belum ada titik survey untuk digambar');
+    return;
+  }
   const s = state.settings;
   const sesi = (typeof sesiCakra === 'function' && sesiCakra()) || {};
 

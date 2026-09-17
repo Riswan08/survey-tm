@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=63">
+  <link rel="stylesheet" href="css/style.css?v=64">
 </head>
 <body>
 
@@ -141,6 +141,18 @@
         <div id="grup-pelanggan" class="sembunyi">
           <div class="form-grup"><label>Nama Calon Pelanggan (sesuai KTP)</label>
             <input type="text" id="f-nama-pelanggan" maxlength="60" placeholder="nama lengkap sesuai KTP"></div>
+          <div class="form-grup"><label>Daya yang Dimohon (tampil di Gambar Rencana)</label>
+            <input type="text" id="f-daya" maxlength="30" placeholder="mis. 10.600 VA 3 phasa" list="daftar-daya">
+            <datalist id="daftar-daya">
+              <option value="450 VA"></option><option value="900 VA"></option>
+              <option value="1.300 VA"></option><option value="2.200 VA"></option>
+              <option value="3.500 VA"></option><option value="5.500 VA"></option>
+              <option value="7.700 VA"></option><option value="6.600 VA 3 phasa"></option>
+              <option value="10.600 VA 3 phasa"></option><option value="13.200 VA 3 phasa"></option>
+              <option value="16.500 VA 3 phasa"></option><option value="23.000 VA 3 phasa"></option>
+              <option value="33.000 VA 3 phasa"></option><option value="41.500 VA 3 phasa"></option>
+              <option value="53.000 VA 3 phasa"></option>
+            </datalist></div>
           <div class="form-grup"><label>Eviden (foto terkompresi otomatis)</label>
             <div id="eviden-pelanggan"></div>
           </div>
@@ -412,6 +424,7 @@
           <div data-lg="sutm"><span class="lg-garis"></span> SUTM</div>
           <div data-lg="cantol"><svg width="11" height="17" viewBox="0 0 16 26" style="flex:0 0 auto"><path d="M2 12 h12 v-6 L8 1 L2 6 Z" fill="#111"/><rect x="6.8" y="12" width="2.4" height="12" fill="#111"/></svg> TRAFO CANTOL</div>
           <div data-lg="portal"><svg width="17" height="17" viewBox="0 0 26 26" style="flex:0 0 auto"><path d="M3 13 h20 v-7 L13 1 L3 6 Z" fill="#111"/><rect x="6" y="13" width="2.4" height="11" fill="#111"/><rect x="17.6" y="13" width="2.4" height="11" fill="#111"/></svg> TRAFO PORTAL</div>
+          <div data-lg="pelanggan"><span class="lg-kotak" style="background:#7b1fa2"></span> CALON PELANGGAN (nama — daya)</div>
         </div>
         <div class="ls-baris"><small>NOMOR GAMBAR :</small><b id="lg-t-nomor" style="font-size:15px;text-align:center">—</b></div>
       </div>
@@ -421,9 +434,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=63"></script>
-  <script src="js/app.js?v=63"></script>
-  <script src="js/masuk.js?v=63"></script>
+  <script src="js/data.js?v=64"></script>
+  <script src="js/app.js?v=64"></script>
+  <script src="js/masuk.js?v=64"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

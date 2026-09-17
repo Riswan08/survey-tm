@@ -163,6 +163,7 @@ function rapikan(p, i) {
     lat, lng,
     mode: (p.mode === 'eksisting' || p.mode === 'pelanggan') ? p.mode : 'rencana',
     namaPelanggan: typeof p.namaPelanggan === 'string' ? p.namaPelanggan.slice(0, 60) : '',
+    daya: typeof p.daya === 'string' ? p.daya.slice(0, 30) : '',
     fotoPelanggan: (p.fotoPelanggan && typeof p.fotoPelanggan === 'object') ? p.fotoPelanggan : {},
     konstruksi: KONSTRUKSI[p.konstruksi] ? p.konstruksi : 'TM-1',
     jenisAset: JENIS_ASET[p.jenisAset] ? p.jenisAset : 'TIANG_TM',
@@ -905,7 +906,7 @@ function renderTabelPelanggan() {
     return;
   }
   let html = `<table class="rab"><tr>
-    <th>Kode</th><th>Nama (sesuai KTP)</th><th>Kelengkapan</th>`;
+    <th>Kode</th><th>Nama (sesuai KTP)</th><th>Daya Dimohon</th><th>Kelengkapan</th>`;
   Object.values(EVIDEN_PELANGGAN).forEach(l => { html += `<th>${l}</th>`; });
   html += `<th>Petugas</th><th>Catatan</th><th>Peta</th></tr>`;
   daftar.forEach((p, i) => {
@@ -915,6 +916,7 @@ function renderTabelPelanggan() {
     html += `<tr>
       <td>${p.nama}</td>
       <td><b>${p.namaPelanggan || '—'}</b></td>
+      <td>${p.daya || '—'}</td>
       <td><span class="badge-skor" style="background:${lengkap === total ? '#2e7d32' : '#f57c00'}">${lengkap}/${total}</span></td>`;
     Object.entries(EVIDEN_PELANGGAN).forEach(([kode, label]) => {
       html += `<td>${f[kode]
