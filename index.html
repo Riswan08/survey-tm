@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=71">
+  <link rel="stylesheet" href="css/style.css?v=72">
 </head>
 <body>
 
@@ -21,7 +21,8 @@
     <nav id="menu-bar">
       <button class="tombol-bar" id="btn-cari" title="Cari desa / lokasi / tikor">🔍</button>
       <button class="tombol-bar" id="btn-daftar" title="Daftar tiang">📋<span class="teks-bar"> Tiang</span></button>
-      <button class="tombol-bar" id="btn-tugas" title="Penugasan survey untuk Anda" style="position:relative">🗒️
+      <!-- fitur PENUGASAN SURVEY disembunyikan (fokus perluasan & calon pelanggan) -->
+      <button class="tombol-bar" id="btn-tugas" title="Penugasan survey untuk Anda" style="position:relative;display:none">🗒️
         <span id="badge-tugas" class="badge-skor sembunyi" style="background:#e53935;position:absolute;top:-5px;right:-5px">0</span></button>
       <button class="tombol-bar" id="btn-perluasan" title="Pekerjaan Perluasan JTM / JTR">⚡</button>
       <button class="tombol-bar" id="btn-rab" title="RAB survey">💰<span class="teks-bar"> RAB</span></button>
@@ -461,9 +462,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=71"></script>
-  <script src="js/app.js?v=71"></script>
-  <script src="js/masuk.js?v=71"></script>
+  <script src="js/data.js?v=72"></script>
+  <script src="js/app.js?v=72"></script>
+  <script src="js/masuk.js?v=72"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
