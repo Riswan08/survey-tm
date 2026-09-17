@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=64">
+  <link rel="stylesheet" href="css/style.css?v=65">
 </head>
 <body>
 
@@ -424,7 +424,9 @@
           <div data-lg="sutm"><span class="lg-garis"></span> SUTM</div>
           <div data-lg="cantol"><svg width="11" height="17" viewBox="0 0 16 26" style="flex:0 0 auto"><path d="M2 12 h12 v-6 L8 1 L2 6 Z" fill="#111"/><rect x="6.8" y="12" width="2.4" height="12" fill="#111"/></svg> TRAFO CANTOL</div>
           <div data-lg="portal"><svg width="17" height="17" viewBox="0 0 26 26" style="flex:0 0 auto"><path d="M3 13 h20 v-7 L13 1 L3 6 Z" fill="#111"/><rect x="6" y="13" width="2.4" height="11" fill="#111"/><rect x="17.6" y="13" width="2.4" height="11" fill="#111"/></svg> TRAFO PORTAL</div>
-          <div data-lg="pelanggan"><span class="lg-kotak" style="background:#7b1fa2"></span> CALON PELANGGAN (nama — daya)</div>
+          <div data-lg="pelanggan"><span class="lg-kotak" style="background:#7b1fa2"></span> CALON PELANGGAN (bernomor)</div>
+          <div data-lg="sr"><span class="lg-garis" style="border-top:2px dashed #7b1fa2"></span> SR (Sambungan Rumah)</div>
+          <div id="lg-plg" style="font-size:9.5px;line-height:1.45;margin-top:2px"></div>
         </div>
         <div class="ls-baris"><small>NOMOR GAMBAR :</small><b id="lg-t-nomor" style="font-size:15px;text-align:center">—</b></div>
       </div>
@@ -434,9 +436,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=64"></script>
-  <script src="js/app.js?v=64"></script>
-  <script src="js/masuk.js?v=64"></script>
+  <script src="js/data.js?v=65"></script>
+  <script src="js/app.js?v=65"></script>
+  <script src="js/masuk.js?v=65"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {

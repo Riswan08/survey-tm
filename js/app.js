@@ -3259,26 +3259,42 @@ function gambarLembar() {
     }
   });
 
-  // CALON PELANGGAN pekerjaan ini: kotak ungu + label nama & daya yang dimohon
+  // CALON PELANGGAN pekerjaan ini: kotak ungu BERNOMOR kecil (tidak menutupi
+  // gambar) + garis SR ke titik jaringan TR terdekat — daftar "no. nama — daya"
+  // ditulis rapi di panel KETERANGAN GAMBAR, bukan di atas peta
   const pelangganG = pelangganRencana();
-  pelangganG.forEach(p => {
+  let adaSR = false;
+  const daftarPlg = [];
+  pelangganG.forEach((p, i) => {
+    const no = i + 1;
+    // SR (sambungan rumah): pelanggan → tiang terdekat (rencana pekerjaan ini
+    // atau tiang TR eksisting), digambar dulu agar kotaknya di atas garis
+    let dekat = null, dMin = Infinity;
+    const uji = (t) => { const d = haversine(p, t); if (d < dMin) { dMin = d; dekat = t; } };
+    rencana.forEach(uji);
+    asetStatis.forEach(t => { if (asetTRKah(t)) uji(t); });
+    if (dekat && dMin <= 300) {
+      adaSR = true;
+      L.polyline([[dekat.lat, dekat.lng], [p.lat, p.lng]],
+        { color: '#7b1fa2', weight: 2, dashArray: '3 5' }).addTo(layerLembar);
+    }
     L.marker([p.lat, p.lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="width:11px;height:11px;background:#7b1fa2;border:1.5px solid #fff;border-radius:2px"></div>`,
-        iconSize: [11, 11], iconAnchor: [5, 5],
+        html: `<div style="width:14px;height:14px;background:#7b1fa2;border:1.5px solid #fff;border-radius:2px;
+          color:#fff;font:800 9px/12px system-ui,Arial;text-align:center">${no}</div>`,
+        iconSize: [14, 14], iconAnchor: [7, 7],
       }),
       interactive: false,
     }).addTo(layerLembar);
-    L.marker([p.lat, p.lng], {
-      icon: L.divIcon({
-        className: 'lg-nama',
-        html: `${p.namaPelanggan || p.nama}${p.daya ? ' — ' + p.daya : ''}`,
-        iconAnchor: [-8, -4],
-      }),
-      interactive: false,
-    }).addTo(layerLembar);
+    daftarPlg.push(`<div><span style="font-weight:800">${no}.</span> ${p.namaPelanggan || p.nama}${p.daya ? ' — ' + p.daya : ''}</div>`);
   });
+  const wadahPlg = $('#lg-plg');
+  if (wadahPlg) {
+    const MAKS_PLG = 12;
+    wadahPlg.innerHTML = daftarPlg.slice(0, MAKS_PLG).join('') +
+      (daftarPlg.length > MAKS_PLG ? `<div>… +${daftarPlg.length - MAKS_PLG} pelanggan lainnya</div>` : '');
+  }
 
   // legenda dinamis: baris keterangan tampil hanya bila datanya ada di gambar
   const eks = state.poles.filter(p => p.mode === 'eksisting');
@@ -3291,6 +3307,7 @@ function gambarLembar() {
     cantol: eks.some(p => p.jenisAset === 'TRAFO_CANTOL'),
     portal: eks.some(p => p.jenisAset === 'TRAFO_PORTAL'),
     pelanggan: pelangganG.length > 0,
+    sr: adaSR,
   };
   document.querySelectorAll('#lembar [data-lg]').forEach(el => {
     el.style.display = tampilLegenda[el.dataset.lg] ? '' : 'none';
