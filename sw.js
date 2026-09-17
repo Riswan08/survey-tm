@@ -9,7 +9,7 @@
      SW), jadi taging offline aman.
    ============================================================ */
 
-const VERSI = 'v65';
+const VERSI = 'v66';
 const CACHE_APP = 'stm-app-' + VERSI;
 const CACHE_TILE = 'stm-tiles-v1';
 const MAKS_TILE = 4000; // batas jumlah tile tersimpan
@@ -17,12 +17,12 @@ const MAKS_TILE = 4000; // batas jumlah tile tersimpan
 const ASET_APP = [
   './',
   './index.html',
-  './css/style.css?v=65',
-  './js/data.js?v=65',
-  './js/app.js?v=65',
+  './css/style.css?v=66',
+  './js/data.js?v=66',
+  './js/app.js?v=66',
   './dasbor.html',
-  './js/dasbor.js?v=65',
-  './js/masuk.js?v=65',
+  './js/dasbor.js?v=66',
+  './js/masuk.js?v=66',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/images/layers.png',
@@ -35,16 +35,26 @@ const ASET_APP = [
   './icons/logo-pln.png',
   './icons/icon-512.png',
   './manifest.json',
-  './data/aset-tm.json',
-  './data/aset-tr.json',
 ];
+
+// data aset TM & TR (±12 MB) — cache TERSENDIRI yang TIDAK ikut dibuang saat
+// versi aplikasi naik: tidak perlu unduh ulang tiap update, dan jaringan
+// eksisting langsung tersedia walau update baru terpasang
+const CACHE_ASET = 'stm-aset-v1';
+const DATA_ASET = ['./data/aset-tm.json', './data/aset-tr.json'];
 
 const HOST_TILE = ['tile.openstreetmap.org', 'server.arcgisonline.com', 'basemaps.cartocdn.com'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_APP).then((c) => c.addAll(ASET_APP)).then(() => self.skipWaiting())
-  );
+  e.waitUntil(Promise.all([
+    caches.open(CACHE_APP).then((c) => c.addAll(ASET_APP)),
+    // data aset diunduh hanya bila belum ada di cache permanen
+    caches.open(CACHE_ASET).then(async (c) => {
+      for (const u of DATA_ASET) {
+        if (!(await c.match(u))) { try { await c.add(u); } catch (err) { /* offline — diisi saat fetch */ } }
+      }
+    }),
+  ]).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -72,6 +82,20 @@ self.addEventListener('fetch', (e) => {
   if (url.pathname.startsWith('/api/')) return;
   // konfig.json juga selalu dari jaringan — berisi alamat server terkini
   if (url.pathname.endsWith('/konfig.json')) return;
+
+  // Data aset TM/TR: cache-first dari cache permanen (lintas versi aplikasi)
+  if (url.origin === self.location.origin && /\/data\/aset-(tm|tr)\.json$/.test(url.pathname)) {
+    e.respondWith(
+      caches.open(CACHE_ASET).then(async (c) => {
+        const ada = await c.match(e.request, { ignoreSearch: true });
+        if (ada) return ada;
+        const res = await fetch(e.request);
+        if (res.ok) c.put(e.request, res.clone());
+        return res;
+      })
+    );
+    return;
+  }
 
   // Tile peta: cache-first, isi cache saat online
   if (HOST_TILE.some((h) => url.hostname.endsWith(h))) {

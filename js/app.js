@@ -626,8 +626,11 @@ async function muatAsetStatis() {
     } catch (e) { return []; /* offline sebelum sempat ter-cache — coba lagi saat online */ }
   }));
   asetStatis = hasil.flat();
-  if (!asetStatis.length) return;
+  if (!asetStatis.length) { setTimeout(muatAsetStatis, 60000); return; } // sinyal lemah — coba lagi
   render(); // gambar ulang termasuk garis jaringan aset + koreksi
+  // lembar Gambar Rencana yang SEDANG TERBUKA ikut digambar ulang — jaringan
+  // eksisting tampil walau datanya baru selesai terunduh setelah lembar dibuka
+  if (petaLembar && !$('#lembar-wrap').classList.contains('sembunyi')) gambarLembar();
   // pemakaian pertama (belum ada titik survey): fokuskan peta ke wilayah aset
   if (!state.poles.length) {
     map.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });

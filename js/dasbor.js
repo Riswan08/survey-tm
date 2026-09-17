@@ -355,7 +355,7 @@ async function muatAsetStatis() {
     } catch (e) { return []; /* offline tanpa cache — lewati */ }
   }));
   asetStatis = hasil.flat();
-  if (!asetStatis.length) return;
+  if (!asetStatis.length) { setTimeout(muatAsetStatis, 60000); return; } // sinyal lemah — coba lagi
   renderPeta();
   if (!poles.length) {
     peta.fitBounds(asetStatis.filter((_, i) => i % 25 === 0).map(p => [p.lat, p.lng]), { padding: [30, 30] });
