@@ -3152,9 +3152,19 @@ function gambarLembar() {
   layerLembar.clearLayers();
   const s = state.settings;
 
-  // garis jaringan eksisting (aset bawaan + survey + koreksi) di sekitar proyek
-  // saja — TM utuh, TR putus-putus (sesuai level tegangan)
-  const batas = L.latLngBounds(state.poles.map(p => [p.lat, p.lng])).pad(0.6);
+  // garis jaringan eksisting (aset bawaan + survey + koreksi) di sekitar
+  // PEKERJAAN YANG DIGAMBAR — TM utuh, TR putus-putus (sesuai level tegangan).
+  // Batas memakai MARGIN ABSOLUT ±2 km (bukan pad relatif): pekerjaan kecil
+  // (mis. 1–2 titik) tetap menampilkan jaringan di sekitarnya
+  const acuanBatas = (rencanaTampil || polesRencana()).concat(pelangganRencana());
+  const dasarBatas = acuanBatas.length ? acuanBatas : state.poles;
+  const batasKecil = L.latLngBounds(dasarBatas.map(p => [p.lat, p.lng]));
+  const MARGIN_BATAS = 0.02; // ≈ 2 km
+  const batas = batasKecil.isValid()
+    ? L.latLngBounds(
+        [batasKecil.getSouth() - MARGIN_BATAS, batasKecil.getWest() - MARGIN_BATAS],
+        [batasKecil.getNorth() + MARGIN_BATAS, batasKecil.getEast() + MARGIN_BATAS])
+    : batasKecil;
   const jaringan = sambunganFinal();
   const segmenEksTM = [], segmenEksTR = [];
   jaringan.edges.forEach(([a, b]) => {
