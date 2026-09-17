@@ -3170,6 +3170,17 @@ function gambarLembar() {
     L.polyline(segmenEksTR, { color: '#f9a825', weight: 2.5, dashArray: '7 7', smoothFactor: 2 }).addTo(layerLembar);
   }
 
+  // TITIK TIANG jaringan eksisting di sekitar pekerjaan: TM hitam · TR kuning
+  // (kecil, tanpa label — hanya penanda posisi tiang di sepanjang garisnya)
+  const uidDiPoles = new Set(state.poles.map(p => p.uid));
+  asetStatis.forEach(p => {
+    if (uidDiPoles.has(p.uid) || !batas.contains([p.lat, p.lng])) return;
+    L.circleMarker([p.lat, p.lng], {
+      radius: 3.5, weight: 1.2, color: '#fff', fillOpacity: 1, interactive: false,
+      fillColor: asetTRKah(p) ? '#f9a825' : WARNA_LEMBAR.eksisting,
+    }).addTo(layerLembar);
+  });
+
   // rute rencana per gawang: SUTR (konstruksi JTR) putus-putus, SUTM utuh + label jarak
   const rencana = polesRencana();
   let adaSUTR = segmenEksTR.length > 0, adaSUTM = segmenEksTM.length > 0; // jaringan eksisting sesuai levelnya
