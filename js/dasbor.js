@@ -79,7 +79,8 @@ function biayaTitikRencana(p) {
     const ak = AKSESORIS[a];
     if (ak) Object.entries(ak.bom).forEach(([kode, q]) => tambah(kode, q));
   });
-  total += hargaMat('JASA_TIANG');
+  const tarifPsg = JASA_PASANG_TIANG[p.tiang];
+  total += tarifPsg ? (tarifPsg[p.tanah] || tarifPsg.biasa) : hargaMat('JASA_TIANG');
   return total;
 }
 
@@ -166,6 +167,7 @@ function rapikan(p, i) {
     daya: typeof p.daya === 'string' ? p.daya.slice(0, 30) : '',
     fotoPelanggan: (p.fotoPelanggan && typeof p.fotoPelanggan === 'object') ? p.fotoPelanggan : {},
     konstruksi: KONSTRUKSI[p.konstruksi] ? p.konstruksi : 'TM-1',
+    tanah: JENIS_TANAH[p.tanah] ? p.tanah : 'biasa',
     jenisAset: JENIS_ASET[p.jenisAset] ? p.jenisAset : 'TIANG_TM',
     kondisi: KONDISI[p.kondisi] ? p.kondisi : 'baik',
     dampak: DAMPAK[p.dampak] ? p.dampak : 'sedang',

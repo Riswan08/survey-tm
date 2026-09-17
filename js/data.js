@@ -17,11 +17,16 @@
 // kategori: tiang | material | penghantar | jasa
 // ------------------------------------------------------------
 const MATERIALS = {
-  // --- Batang tiang (HARGA CONTOH — tidak ada di lampiran, silakan sesuaikan) ---
-  TIANG_12_200:  { nama: 'Tiang Beton 12 m / 200 daN',  satuan: 'btg', harga: 4200000, jasa: 0, kategori: 'tiang' },
-  TIANG_12_350:  { nama: 'Tiang Beton 12 m / 350 daN',  satuan: 'btg', harga: 5500000, jasa: 0, kategori: 'tiang' },
+  // --- Batang tiang BESI sesuai daftar jasa pemasangan unit ---
+  // (harga MATERIAL batang tiang tidak ada di lampiran — isi/ubah lewat 💰 Harga
+  //  Terpusat; jasa pemasangannya per jenis tanah di JASA_PASANG_TIANG bawah)
+  TIANG_12_200:  { nama: 'Tiang Besi 12 m / 200 daN',   satuan: 'btg', harga: 4200000, jasa: 0, kategori: 'tiang' },
+  TIANG_12_350:  { nama: 'Tiang Besi 12 m / 350 daN',   satuan: 'btg', harga: 5500000, jasa: 0, kategori: 'tiang' },
+  TIANG_12_500:  { nama: 'Tiang Besi 12 m / 500 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
+  TIANG_14_350:  { nama: 'Tiang Besi 14 m / 350 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
+  TIANG_14_500:  { nama: 'Tiang Besi 14 m / 500 daN',   satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
   TIANG_13_350:  { nama: 'Tiang Beton 13 m / 350 daN',  satuan: 'btg', harga: 6500000, jasa: 0, kategori: 'tiang' },
-  TIANG_BESI:    { nama: 'Tiang Besi (harga sesuai kontrak)', satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
+  TIANG_BESI:    { nama: 'Tiang Besi (lainnya — harga sesuai kontrak)', satuan: 'btg', harga: 0, jasa: 0, kategori: 'tiang' },
 
   // --- Besi UNP & siku (lampiran) ---
   UNP10_1000:    { nama: 'Besi UNP 10 (5x50x100x1000 mm) Galv.',  satuan: 'btg', harga: 574133,  jasa: 31590,  kategori: 'material' },
@@ -74,6 +79,9 @@ const MATERIALS = {
   SLING35:       { nama: 'Sling Baja 35 mm² (galvanized steel wire)', satuan: 'mtr', harga: 33882, jasa: 3000, kategori: 'material' },
   BETON_SCHOOR:  { nama: 'Beton Block Schoor Tarik MB-K175',       satuan: 'bh',  harga: 217407, jasa: 70770, kategori: 'material' },
   ISOL_TELUR:    { nama: 'Isolator Telur TM',                      satuan: 'bh',  harga: 95496,  jasa: 5710,  kategori: 'material' },
+  ISOLATOR_TUMPU:{ nama: 'Isolator Tumpu (Pin Post) + Asesories',  satuan: 'bh',  harga: 0,      jasa: 43810, kategori: 'material' },
+  PENGECATAN_12_200: { nama: 'Pengecatan Tiang 12 mtr 200 dAN (Cat silver + Cat Hitam + Cat Menie = 1,8 mtr)', satuan: 'btg', harga: 310216, jasa: 161460, kategori: 'material' },
+  MANSET_12_200: { nama: 'Manset Tiang 12 mtr 200 dAN (1 tiang = 0,066 m3)', satuan: 'btg', harga: 386016, jasa: 109629, kategori: 'material' },
   TURNBUCKLE:    { nama: 'Spanschroef / Turn Buckle 5/8 inch',     satuan: 'bh',  harga: 124477, jasa: 11730, kategori: 'material' },
   WIRECLIP35:    { nama: 'Wire Clip 35 mm²',                       satuan: 'bh',  harga: 14023,  jasa: 5670,  kategori: 'material' },
   ANGKER:        { nama: 'Besi Angker 16 x 1800 mm Galv.',         satuan: 'btg', harga: 202229, jasa: 41300, kategori: 'material' },
@@ -123,8 +131,9 @@ const MATERIALS = {
 const KONSTRUKSI = {
   'TM-1': {
     nama: 'Tiang Penumpu', sudut: 'jalur lurus', warna: '#1976d2',
-    desc: 'Konstruksi tiang penumpu tunggal.',
-    bom: { UNP10_2000: 1, ADAPTOR: 1, SIKU_672: 2, BEUGEL_5: 1, KLEM_SIKU_5: 1, MUR50: 2, MUR75: 4, MUR180: 2, BENDING: 3 },
+    desc: 'Konstruksi tiang penumpu tunggal — master data lengkap sesuai RAB resmi unit (termasuk isolator tumpu, rambu pengaman, pengecatan & manset).',
+    bom: { UNP10_2000: 1, ADAPTOR: 1, SIKU_672: 2, BEUGEL_5: 1, KLEM_SIKU_5: 1, MUR50: 2, MUR75: 4, MUR180: 2, BENDING: 3,
+           ISOLATOR_TUMPU: 3, PENGHALANG: 1, RAMBU: 1, PENGECATAN_12_200: 1, MANSET_12_200: 1 },
   },
   'TM-2': {
     nama: 'Tiang Penumpu Ganda', sudut: 'penumpu ganda / sudut', warna: '#00897b',
@@ -480,4 +489,20 @@ const DEFAULT_SETTINGS = {
   petugas: '',              // nama surveyor — tercatat di tiap titik
 };
 
-const DEFAULT_TIANG = 'TIANG_BESI';
+const DEFAULT_TIANG = 'TIANG_12_200';
+
+// ---------------- JASA PEMASANGAN TIANG per JENIS TIANG × JENIS TANAH ----------------
+// Sesuai daftar harga jasa unit — dipilih lewat dropdown Jenis Tanah saat taging.
+const JENIS_TANAH = {
+  biasa:  'Tanah biasa',
+  cadas:  'Tanah cadas',
+  karang: 'Tanah karang keras',
+};
+const JASA_PASANG_TIANG = {
+  TIANG_12_200: { biasa: 929100,  cadas: 1238800, karang: 2898100 },
+  TIANG_12_350: { biasa: 1079700, cadas: 1477500, karang: 3287900 },
+  TIANG_12_500: { biasa: 1193300, cadas: 1591100, karang: 3412000 },
+  TIANG_14_350: { biasa: 1193300, cadas: 1591100, karang: 3412000 },
+  TIANG_14_500: { biasa: 1307000, cadas: 1988900, karang: 3536000 },
+  // jenis tiang lain (beton 13 m, TR 9 m, kontrak) memakai JASA_TIANG umum
+};

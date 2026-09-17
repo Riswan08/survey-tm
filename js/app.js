@@ -336,6 +336,7 @@ function normalisasiPole(p, indeks) {
       return bersih;
     })(),
     tiang: MATERIALS[p.tiang] && MATERIALS[p.tiang].kategori === 'tiang' ? p.tiang : DEFAULT_TIANG,
+    tanah: JENIS_TANAH[p.tanah] ? p.tanah : 'biasa',
     konstruksi: KONSTRUKSI[p.konstruksi] ? p.konstruksi : 'TM-1',
     aksesoris: Array.isArray(p.aksesoris) ? p.aksesoris.filter(a => AKSESORIS[a]) : [],
     jenisAset: JENIS_ASET[p.jenisAset] ? p.jenisAset : 'TIANG_TM',
@@ -1113,6 +1114,33 @@ function bomTiang(pole) {
   return bom;
 }
 
+// jasa pemasangan tiang sesuai JENIS TIANG × JENIS TANAH (dropdown saat taging);
+// jenis tiang di luar daftar memakai tarif umum JASA_TIANG
+function jasaTanamTiang(pole) {
+  const tarif = JASA_PASANG_TIANG[pole.tiang];
+  if (!tarif) return hargaEfektif('JASA_TIANG');
+  return tarif[pole.tanah] || tarif.biasa;
+}
+
+// rekap baris "Pemasangan Tiang … — jenis tanah" untuk RAB (dikelompokkan)
+function rekapPasangTiang() {
+  const grup = new Map();
+  polesRencana().forEach(p => {
+    const bertarif = !!JASA_PASANG_TIANG[p.tiang];
+    const kunci = bertarif ? `${p.tiang}|${p.tanah || 'biasa'}` : 'UMUM';
+    if (!grup.has(kunci)) {
+      grup.set(kunci, {
+        nama: bertarif
+          ? `Pemasangan ${MATERIALS[p.tiang].nama} — ${JENIS_TANAH[p.tanah] || JENIS_TANAH.biasa}`
+          : MATERIALS.JASA_TIANG.nama,
+        harga: jasaTanamTiang(p), qty: 0,
+      });
+    }
+    grup.get(kunci).qty++;
+  });
+  return [...grup.values()];
+}
+
 function biayaPerTiang(pole) {
   const bom = bomTiang(pole);
   let material = 0, jasaKonstruksi = 0;
@@ -1120,7 +1148,7 @@ function biayaPerTiang(pole) {
     material += hargaEfektif(kode) * q;
     jasaKonstruksi += jasaEfektif(kode) * q;
   });
-  const jasaTanam = hargaEfektif('JASA_TIANG');
+  const jasaTanam = jasaTanamTiang(pole);
   const jasa = jasaKonstruksi + jasaTanam;
   return { bom, material, jasaKonstruksi, jasaTanam, jasa, total: material + jasa };
 }
@@ -1159,7 +1187,7 @@ function hitungRAB() {
   const biayaPenghantar = panjangKawat * hargaEfektif(s.penghantar);
 
   // 3) jasa
-  const jasaTiang = rencana.length * hargaEfektif('JASA_TIANG');
+  const jasaTiang = rencana.reduce((jml, p) => jml + jasaTanamTiang(p), 0);
   const jasaTarik = (rutePenghantar / 1000) * hargaEfektif('JASA_TARIK');
 
   // 4) usulan perbaikan aset eksisting — terurut skor prioritas
@@ -1357,6 +1385,7 @@ function bukaFormTiang(id, latlng) {
   $('#f-lat').value = draftLatLng.lat.toFixed(6);
   $('#f-lng').value = draftLatLng.lng.toFixed(6);
   $('#f-tiang').value = pole ? pole.tiang : DEFAULT_TIANG;
+  $('#f-tanah').value = pole ? (pole.tanah || 'biasa') : ($('#f-tanah').value || 'biasa');
   $('#f-catatan').value = pole ? (pole.catatan || '') : '';
 
   // kartu konstruksi — dikelompokkan JTM / JTR
@@ -1454,6 +1483,7 @@ function poleDariForm() {
     lng: parseFloat($('#f-lng').value),
     mode: draftModeTitik,
     tiang: $('#f-tiang').value,
+    tanah: $('#f-tanah').value || 'biasa',
     konstruksi: (kartuPilih && kartuPilih.dataset.kode) || draftKonstruksi,
     aksesoris: [...document.querySelectorAll('#pilih-aksesoris input:checked')].map(i => i.value),
     jenisAset: $('#f-jenis-aset').value || 'TIANG_TM',
@@ -1762,6 +1792,7 @@ function bukaTanamCepat() {
     return;
   }
   $('#q-tiang').value = state.settings.tiangTerakhir || DEFAULT_TIANG;
+  if (!$('#q-tanah').value) $('#q-tanah').value = 'biasa';
 
   const wa = $('#q-aksesoris');
   wa.innerHTML = '';
@@ -1817,6 +1848,7 @@ function tanamCepat(kode) {
     lat: fix.lat,
     lng: fix.lng,
     tiang: $('#q-tiang').value,
+    tanah: $('#q-tanah').value || 'biasa',
     konstruksi: kode,
     aksesoris: [...document.querySelectorAll('#q-aksesoris input:checked')].map(i => i.value),
     catatan: `akurasi GPS ±${Math.round(fix.akurasi)} m`,
@@ -1887,8 +1919,8 @@ function renderRAB() {
   html += `<div class="judul-seksi">C. Jasa Pemasangan</div>
     <div class="bungkus-tabel"><table class="rab">
       <tr><th>Uraian</th><th class="angka">Vol</th><th>Sat</th><th class="angka">Harga Satuan</th><th class="angka">Jumlah</th></tr>
-      <tr><td>${MATERIALS.JASA_TIANG.nama}</td><td class="angka">${polesRencana().length}</td><td>tiang</td>
-        <td class="angka">${rupiah(hargaEfektif('JASA_TIANG'))}</td><td class="angka">${rupiah(rab.jasaTiang)}</td></tr>
+      ${rekapPasangTiang().map(r => `<tr><td>${r.nama}</td><td class="angka">${r.qty}</td><td>btg</td>
+        <td class="angka">${rupiah(r.harga)}</td><td class="angka">${rupiah(r.harga * r.qty)}</td></tr>`).join('')}
       <tr><td>${MATERIALS.JASA_TARIK.nama}</td><td class="angka">${angka(rab.rutePenghantar / 1000, 2)}</td><td>km</td>
         <td class="angka">${rupiah(hargaEfektif('JASA_TARIK'))}</td><td class="angka">${rupiah(rab.jasaTarik)}</td></tr>
     </table></div>`;
@@ -2664,7 +2696,7 @@ function eksporCSV() {
   baris(`${rab.ph.nama} (${rab.ph.fasa} fasa x sag ${s.sagFactor})`, Math.round(rab.panjangKawat), 'm', hargaEfektif(s.penghantar), Math.round(rab.biayaPenghantar));
   baris('');
   baris('C. JASA');
-  baris(MATERIALS.JASA_TIANG.nama, polesRencana().length, 'tiang', hargaEfektif('JASA_TIANG'), Math.round(rab.jasaTiang));
+  rekapPasangTiang().forEach(r => baris(r.nama, r.qty, 'btg', r.harga, r.harga * r.qty));
   baris(MATERIALS.JASA_TARIK.nama, (rab.rutePenghantar / 1000).toFixed(2), 'km', hargaEfektif('JASA_TARIK'), Math.round(rab.jasaTarik));
   baris('');
   baris('Subtotal', '', '', '', Math.round(rab.subtotal));
@@ -3507,7 +3539,7 @@ function renderRABResmi() {
   }
   if (polesRencana().length) {
     seksi('JASA');
-    baris(MATERIALS.JASA_TIANG.nama, 'Btg', polesRencana().length, angka(polesRencana().length), 0, hargaEfektif('JASA_TIANG'));
+    rekapPasangTiang().forEach(r => baris(r.nama, 'Btg', r.qty, angka(r.qty), 0, r.harga));
     if (rab.rutePenghantar > 0) {
       baris(MATERIALS.JASA_TARIK.nama, 'Km', rab.rutePenghantar / 1000, angka(rab.rutePenghantar / 1000, 2), 0, hargaEfektif('JASA_TARIK'));
     }
@@ -3599,6 +3631,10 @@ document.addEventListener('DOMContentLoaded', () => {
     .map(([kode, m]) => `<option value="${kode}">${m.nama.replace('Tiang ', '')}</option>`).join('');
   $('#f-tiang').innerHTML = opsiTiang;
   $('#q-tiang').innerHTML = opsiTiang;
+  const opsiTanah = Object.entries(JENIS_TANAH)
+    .map(([k, n]) => `<option value="${k}">${n}</option>`).join('');
+  $('#f-tanah').innerHTML = opsiTanah;
+  $('#q-tanah').innerHTML = opsiTanah;
 
   // indikator offline — taging tetap jalan, hanya tile peta baru yang butuh internet
   const badgeOffline = () => $('#badge-offline').classList.toggle('sembunyi', navigator.onLine !== false);

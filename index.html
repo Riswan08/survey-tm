@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=73">
+  <link rel="stylesheet" href="css/style.css?v=74">
 </head>
 <body>
 
@@ -77,6 +77,9 @@
           <div class="form-grup"><label>Jenis Tiang</label>
             <select id="q-tiang"></select><!-- opsi diisi dari data.js — satu sumber data -->
           </div>
+          <div class="form-grup"><label>Jenis Tanah</label>
+            <select id="q-tanah"></select>
+          </div>
         </div>
         <div class="form-grup"><label>Aksesoris Tambahan</label><div id="q-aksesoris"></div></div>
         <div class="form-grup"><label>Ketuk konstruksi untuk langsung menyimpan:</label>
@@ -120,6 +123,9 @@
           <div class="form-grup"><label>Longitude</label><input type="number" step="any" id="f-lng"></div>
         </div>
         <div id="grup-rencana">
+          <div class="form-grup"><label>Jenis Tanah (menentukan harga jasa pemasangan tiang)</label>
+            <select id="f-tanah"></select><!-- opsi dari JENIS_TANAH di data.js -->
+          </div>
           <div class="form-grup">
             <label>Jenis Konstruksi (Standar PLN)</label>
             <div id="pilih-konstruksi"></div>
@@ -463,9 +469,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=73"></script>
-  <script src="js/app.js?v=73"></script>
-  <script src="js/masuk.js?v=73"></script>
+  <script src="js/data.js?v=74"></script>
+  <script src="js/app.js?v=74"></script>
+  <script src="js/masuk.js?v=74"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
