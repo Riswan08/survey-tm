@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Si CAKRA — Dasbor Manajemen Aset</title>
+  <title>Si CAKRA — Dasbor Perluasan Jaringan</title>
   <meta name="theme-color" content="#0c6bb5">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=67">
+  <link rel="stylesheet" href="css/style.css?v=68">
   <style>
     /* tata letak khusus dasbor: halaman menggulir, peta di panel */
     body { overflow: auto; background: var(--abu); }
@@ -70,7 +70,7 @@
 
   <header id="topbar">
     <img class="logo-img" src="icons/logo.png" alt="Si CAKRA">
-    <div class="judul">Si CAKRA — Dasbor<small>Pantau kondisi aset &amp; status usulan perbaikan</small></div>
+    <div class="judul">Si CAKRA — Dasbor<small>Pantau perluasan jaringan &amp; calon pelanggan</small></div>
     <div class="spacer"></div>
     <a class="tombol-bar" href="index.html" style="text-decoration:none">🗺<span class="teks-bar"> Aplikasi Survey</span></a>
     <button class="tombol-bar" onclick="keluarSesi()" title="Keluar">🚪</button>
@@ -108,12 +108,13 @@
 
     <div class="panel">
       <div class="judul-seksi">📊 Kinerja per Petugas — dikelompokkan per Unit (ULP)</div>
-      <p class="catatan-kecil">Berapa titik yang dikerjakan tiap petugas, usulan perbaikannya di tiap
-        tahap (Diusulkan → Disetujui → Dikerjakan → Selesai), nilainya, dan batang hijau = persentase yang sudah selesai.</p>
+      <p class="catatan-kecil">Berapa pekerjaan perluasan tiap petugas, jumlah tiang rencananya (JTM/JTR),
+        panjang rute, perkiraan nilai RAB, dan calon pelanggan yang didata.</p>
       <div class="bungkus-tabel" id="d-monitoring"></div>
     </div>
 
-    <div class="panel">
+    <!-- panel USULAN PERBAIKAN ASET disembunyikan dulu — fokus perluasan & calon pelanggan -->
+    <div class="panel" style="display:none">
       <div class="judul-seksi">Titik dengan Usulan Pekerjaan (ketuk untuk rincian → ketuk pekerjaan menuju lokasi)</div>
       <div id="d-titik-usulan"></div>
     </div>
@@ -148,7 +149,8 @@
       <div id="d-harga-info"></div>
     </div>
 
-    <div class="panel">
+    <!-- panel TINDAK LANJUT USULAN disembunyikan dulu — fokus perluasan & calon pelanggan -->
+    <div class="panel" style="display:none">
       <div class="judul-seksi">✅ Tindak Lanjut Usulan Perbaikan — ubah status di kolom paling kanan</div>
       <div class="baris-alat" style="margin-bottom:10px">
         <select id="d-filter-status"><option value="">Semua status</option></select>
@@ -164,8 +166,8 @@
   <div id="lightbox"><img alt="eviden"><div class="ket"></div></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=67"></script>
-  <script src="js/dasbor.js?v=67"></script>
-  <script src="js/masuk.js?v=67"></script>
+  <script src="js/data.js?v=68"></script>
+  <script src="js/dasbor.js?v=68"></script>
+  <script src="js/masuk.js?v=68"></script>
 </body>
 </html>

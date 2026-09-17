@@ -683,23 +683,12 @@ function renderAsetStatis() {
 function popupAsetStatis(p) {
   const div = document.createElement('div');
   div.className = 'popup-tiang';
+  // tombol "Survey Aset Ini" disembunyikan dulu — fokus perluasan & calon
+  // pelanggan; tiang eksisting tetap tampil sebagai acuan titik sambung
   div.innerHTML = `
     <div class="pjudul">${p.nama} — Tiang ${asetTRKah(p) ? 'TR' : 'TM'} (aset unit)</div>
-    <div class="pinfo">${p.catatan || ''}<br>${Number(p.lat).toFixed(6)}, ${Number(p.lng).toFixed(6)}</div>
-    <div class="paksi"><button class="tombol utama kecil">📝 Survey Aset Ini</button></div>`;
-  div.querySelector('button').onclick = () => {
-    map.closePopup();
-    const n = normalisasiPole(p, state.poles.length);
-    if (!n) return;
-    n.id = idBerikut++;
-    n.uid = p.uid; // uid asli dipertahankan → anti-duplikat lintas surveyor
-    n.petugas = state.settings.petugas || '';
-    n.diubah = Date.now();
-    state.poles.push(n);
-    simpan(); render();
-    bukaFormTiang(n.id);
-    toast(`${n.nama} siap disurvey — isi kondisi & temuannya`);
-  };
+    <div class="pinfo">${p.catatan || ''}<br>${Number(p.lat).toFixed(6)}, ${Number(p.lng).toFixed(6)}<br>
+      <small>🔌 Untuk titik sambung: aktifkan Koreksi Sambungan lalu ketuk tiang ini</small></div>`;
   return div;
 }
 

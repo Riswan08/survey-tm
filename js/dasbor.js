@@ -552,17 +552,10 @@ function renderRingkasan() {
     <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${fmtRute(totRute)}</div><div class="ket"><b>PANJANG RUTE</b> — JTM ${fmtRute(totRuteJTM)} · JTR ${fmtRute(totRuteJTR)}</div></div>
     <div class="kartu-stat" style="${gayaUtama}"><div class="nilai">${rupiah(totBiaya)}</div><div class="ket"><b>± NILAI RAB PERLUASAN</b></div></div>`;
 
-  // baris berikutnya: survey aset & tindak lanjut (pelengkap)
-  const eksisting = poles.filter(p => p.mode === 'eksisting');
-  const rusak = eksisting.filter(p => p.kondisi !== 'baik');
-  const usulan = semuaUsulan();
-  const totalNilai = usulan.reduce((jml, u) => jml + u.total, 0);
-  const selesai = usulan.filter(u => u.entri.status === 'selesai');
+  // kartu survey aset & usulan disembunyikan dulu — fokus perluasan & calon pelanggan
   const pelanggan = poles.filter(p => p.mode === 'pelanggan');
   html += `
-    <div class="kartu-stat"><div class="nilai">${eksisting.length}</div><div class="ket">Aset tersurvey (${rusak.length} rusak)</div></div>
-    <div class="kartu-stat"><div class="nilai">${usulan.length} · ${rupiah(totalNilai)}</div><div class="ket">Usulan perbaikan (${selesai.length} selesai)</div></div>
-    <div class="kartu-stat"><div class="nilai" style="color:#7b1fa2">${pelanggan.length}</div><div class="ket">Calon pelanggan</div></div>`;
+    <div class="kartu-stat"><div class="nilai" style="color:#7b1fa2">${pelanggan.length}</div><div class="ket"><b>CALON PELANGGAN</b> terdata</div></div>`;
   $('#d-ringkasan').innerHTML = html;
 }
 
@@ -612,7 +605,7 @@ function renderDaftarPekerjaan() {
     <th class="angka">Tiang Rencana</th><th class="angka">Rute</th><th class="angka">± RAB Perluasan (Rp)</th>
     <th style="min-width:150px">Tahap &amp; Progres</th>
     <th class="angka">Calon Pelanggan</th>
-    <th class="angka">Usulan Perbaikan</th><th>Terakhir Disimpan</th></tr>`;
+    <th>Terakhir Disimpan</th></tr>`;
   Object.entries(grup)
     .sort((a, b) => {
       // pekerjaan perluasan (punya tiang rencana) selalu di atas, lalu urut terbaru
@@ -654,7 +647,6 @@ function renderDaftarPekerjaan() {
         <td class="angka">${g.pelanggan
           ? `<b style="color:#7b1fa2">${g.pelanggan}</b><br><small>${g.evidenLengkap} eviden lengkap</small>`
           : '—'}</td>
-        <td class="angka">${g.usulan ? `${g.usulan}${g.selesai ? ` (${g.selesai} selesai)` : ''} · ${angka(g.nilai)}` : '—'}</td>
         <td>${tglSingkat(g.terakhir)}</td></tr>`;
     });
   wadah.innerHTML = html + `</table>
@@ -734,52 +726,51 @@ function renderTimeline() {
 // Rekap semua usulan pekerjaan dari seluruh petugas, dikelompokkan per unit:
 // jumlah titik, usulan per status, nilai, dan batang progres penyelesaian.
 function renderMonitoringPetugas() {
+  // FOKUS PERLUASAN: rekap per petugas per unit — pekerjaan perluasan,
+  // tiang rencana (JTM/JTR), panjang rute, ± nilai RAB, calon pelanggan
   const wadah = $('#d-monitoring');
-  const eksisting = poles.filter(p => p.mode === 'eksisting');
   if (!poles.length) {
     wadah.innerHTML = '<p class="catatan-kecil">Belum ada data survey.</p>';
     return;
   }
+  const perluasan = perluasanPerPekerjaan();
 
-  // grup[ulp][petugas] = { titik, usulan: {status: n}, nilai }
+  // grup[ulp][petugas] = rekap
   const grup = {};
-  poles.forEach(p => {
-    const ulp = p.ulp || '(tanpa unit)';
-    const ptg = p.petugas || '(tanpa nama)';
+  const ambil = (ulp, ptg) => {
     grup[ulp] = grup[ulp] || {};
-    const g = grup[ulp][ptg] = grup[ulp][ptg] ||
-      { titik: 0, usulan: { diusulkan: 0, disetujui: 0, dikerjakan: 0, selesai: 0 }, nilai: 0 };
-    g.titik++;
-    (p.usulan || []).forEach(u => {
-      if (g.usulan[u.status] === undefined) return;
-      g.usulan[u.status]++;
-      g.nilai += biayaPaket(u.paket).total;
-    });
+    return grup[ulp][ptg] = grup[ulp][ptg] ||
+      { pekerjaan: 0, tiang: 0, tiangJTM: 0, tiangJTR: 0, rute: 0, biaya: 0, pelanggan: 0 };
+  };
+  Object.values(perluasan).forEach(pl => {
+    const g = ambil(pl.ulp || '(tanpa unit)', pl.petugas || '(tanpa nama)');
+    g.pekerjaan++; g.tiang += pl.tiang; g.tiangJTM += pl.tiangJTM; g.tiangJTR += pl.tiangJTR;
+    g.rute += pl.rute; g.biaya += pl.biaya;
+  });
+  poles.filter(p => p.mode === 'pelanggan').forEach(p => {
+    ambil(p.ulp || '(tanpa unit)', p.petugas || '(tanpa nama)').pelanggan++;
   });
 
   let html = '';
   Object.keys(grup).sort().forEach(ulp => {
     const petugasUnit = grup[ulp];
-    const totalUnit = Object.values(petugasUnit).reduce((a, g) => {
-      a.titik += g.titik; a.nilai += g.nilai;
-      Object.keys(a.usulan).forEach(s => { a.usulan[s] += g.usulan[s]; });
-      return a;
-    }, { titik: 0, nilai: 0, usulan: { diusulkan: 0, disetujui: 0, dikerjakan: 0, selesai: 0 } });
-    const totU = Object.values(totalUnit.usulan).reduce((a, b) => a + b, 0);
+    const tot = Object.values(petugasUnit).reduce((a, g) => {
+      a.pekerjaan += g.pekerjaan; a.tiang += g.tiang; a.rute += g.rute;
+      a.biaya += g.biaya; a.pelanggan += g.pelanggan; return a;
+    }, { pekerjaan: 0, tiang: 0, rute: 0, biaya: 0, pelanggan: 0 });
 
-    html += `<div class="judul-seksi" style="margin-top:10px">🏢 ${ulp} — ${totalUnit.titik} titik · ${totU} usulan · ${rupiah(totalUnit.nilai)}</div>
-      <table class="rab"><tr><th>Petugas</th><th class="angka">Titik</th>
-        ${Object.values(STATUS_USULAN).map(s => `<th class="angka">${s.nama}</th>`).join('')}
-        <th class="angka">Nilai Usulan</th><th style="min-width:120px">Progres Selesai</th></tr>`;
+    html += `<div class="judul-seksi" style="margin-top:10px">🏢 ${ulp} — ${tot.pekerjaan} pekerjaan · ${tot.tiang} tiang · ${fmtRute(tot.rute)} · ${rupiah(tot.biaya)} · ${tot.pelanggan} calon pelanggan</div>
+      <table class="rab"><tr><th>Petugas</th><th class="angka">Pekerjaan Perluasan</th>
+        <th class="angka">Tiang Rencana</th><th class="angka">Rute</th>
+        <th class="angka">± Nilai RAB (Rp)</th><th class="angka">Calon Pelanggan</th></tr>`;
     Object.keys(petugasUnit).sort().forEach(ptg => {
       const g = petugasUnit[ptg];
-      const jml = Object.values(g.usulan).reduce((a, b) => a + b, 0);
-      const persen = jml ? Math.round(g.usulan.selesai / jml * 100) : 0;
-      html += `<tr><td><b>${ptg}</b></td><td class="angka">${g.titik}</td>
-        ${Object.keys(STATUS_USULAN).map(s => `<td class="angka">${g.usulan[s] || ''}</td>`).join('')}
-        <td class="angka">${g.nilai ? angka(g.nilai) : ''}</td>
-        <td><div class="batang-progres"><div style="width:${persen}%"></div></div>
-          <small>${jml ? `${g.usulan.selesai}/${jml} (${persen}%)` : 'belum ada usulan'}</small></td></tr>`;
+      html += `<tr><td><b>${ptg}</b></td>
+        <td class="angka">${g.pekerjaan || '—'}</td>
+        <td class="angka">${g.tiang ? `${g.tiang}${g.tiangJTR ? `<br><small>JTM ${g.tiangJTM} · JTR ${g.tiangJTR}</small>` : ''}` : '—'}</td>
+        <td class="angka">${g.rute ? fmtRute(g.rute) : '—'}</td>
+        <td class="angka">${g.biaya ? angka(g.biaya) : '—'}</td>
+        <td class="angka">${g.pelanggan ? `<b style="color:#7b1fa2">${g.pelanggan}</b>` : '—'}</td></tr>`;
     });
     html += '</table>';
   });

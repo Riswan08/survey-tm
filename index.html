@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=67">
+  <link rel="stylesheet" href="css/style.css?v=68">
 </head>
 <body>
 
@@ -102,7 +102,9 @@
         <div class="form-grup">
           <div class="seg" id="f-mode">
             <button type="button" data-mode="rencana" class="aktif">🆕 Rencana</button>
-            <button type="button" data-mode="eksisting">📋 Aset</button>
+            <!-- mode survey ASET disembunyikan dulu — fokus perluasan & calon pelanggan
+                 (titik eksisting lama tetap bisa dibuka/diedit) -->
+            <button type="button" data-mode="eksisting" style="display:none">📋 Aset</button>
             <button type="button" data-mode="pelanggan">👤 Calon Pelanggan</button>
           </div>
         </div>
@@ -436,9 +438,9 @@
   <div id="toast"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
-  <script src="js/data.js?v=67"></script>
-  <script src="js/app.js?v=67"></script>
-  <script src="js/masuk.js?v=67"></script>
+  <script src="js/data.js?v=68"></script>
+  <script src="js/app.js?v=68"></script>
+  <script src="js/masuk.js?v=68"></script>
   <script>
     // daftarkan service worker → aplikasi bisa dibuka & taging saat offline
     if ('serviceWorker' in navigator) {
